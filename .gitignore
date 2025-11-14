@@ -1,0 +1,29 @@
+# 编译文件
+*.exe
+*.obj
+*.o
+*.dll
+*.pdb
+*.ilk
+
+# Visual Studio 文件
+*.vcxproj.user
+*.vcxproj.filters
+*.sln.docstates
+.vs/
+Debug/
+Release/
+x64/
+
+# Code::Blocks
+*.layout
+*.depend
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+
+# 构建目录
+build/
+bin/
