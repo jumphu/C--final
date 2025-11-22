@@ -24,6 +24,18 @@ lib/
 *.pdb
 *.ilk
 
+# Visual Studio 文件
+*.vcxproj.user
+*.vcxproj.filters
+*.sln.docstates
+Debug/
+Release/
+x64/
+
+# Code::Blocks
+*.layout
+*.depend
+
 # CMake生成的文件
 CMakeCache.txt
 CMakeFiles/
