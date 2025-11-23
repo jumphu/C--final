@@ -12,23 +12,25 @@ public:
     double mass_centre[2]; // mass_centre[0]: x, mass_centre[1]: y
     double velocity[2];    // velocity[0]: vx, velocity[1]: vy
 	double fraction;      // 摩擦系数
+	double restitution = 1; // 恢复系数，默认值为1
+    double totalforce[2];  // 合力累加器: totalforce[0]: fx, totalforce[1]: fy
 	  
     /*Constructors:Shape()
     默认构造函数，质量为1，质心在原点,速度为0
     包含方法:move(), turn()，check_collision(),getMass(),getCentre(),getVelocity()等
     */
     
-    // 默认构造函数：质量为1，质心在原点，速度为0
-    Shape() : mass(1.0), mass_centre{0.0, 0.0}, velocity{0.0, 0.0} {}
+    // 默认构造函数：质量为1，质心在原点，速度为0，合力为0
+    Shape() : mass(1.0), mass_centre{0.0, 0.0}, velocity{0.0, 0.0}, totalforce{0.0, 0.0} {}
     
-    // 单参数构造函数：指定质量，质心在原点，速度为0
-    Shape(double m) : mass(m), mass_centre{0.0, 0.0}, velocity{0.0, 0.0} {}
+    // 单参数构造函数：指定质量，质心在原点，速度为0，合力为0
+    Shape(double m) : mass(m), mass_centre{0.0, 0.0}, velocity{0.0, 0.0}, totalforce{0.0, 0.0} {}
     
-    // 三参数构造函数：指定质量和质心坐标，速度为0
-    Shape(double m, double x, double y) : mass(m), mass_centre{x, y}, velocity{0.0, 0.0} {}
+    // 三参数构造函数：指定质量和质心坐标，速度为0，合力为0
+    Shape(double m, double x, double y) : mass(m), mass_centre{x, y}, velocity{0.0, 0.0}, totalforce{0.0, 0.0} {}
     
-    // 五参数构造函数：完全指定所有属性
-    Shape(double m, double x, double y, double vx, double vy) : mass(m), mass_centre{x, y}, velocity{vx, vy} {}
+    // 五参数构造函数：完全指定所有属性，合力为0
+    Shape(double m, double x, double y, double vx, double vy) : mass(m), mass_centre{x, y}, velocity{vx, vy}, totalforce{0.0, 0.0} {}
 
     // 虚析构函数
     virtual ~Shape() {}
@@ -45,17 +47,30 @@ public:
     double getMass() const;
     void getCentre(double& x, double& y) const;
     void getVelocity(double& vx, double& vy) const;
+	void getFraction(double& f) const;
+	void getRestitution(double& r) const;
+    void getTotalForce(double& fx, double& fy) const;  // 获取当前累加的合力
     
     // 设置方法
     void setMass(double m);
     void setCentre(double x, double y);
     void setVelocity(double vx, double vy);
+	void setFraction(double f) { fraction = f; }
+	void setRestitution(double r) { restitution = r; }
+
+    // 力相关方法
+    void addToTotalForce(double fx, double fy);   // 累加力到合力
+    void clearTotalForce();                        // 清空合力累加器
+    void applyTotalForce(double deltaTime);        // 应用累加的合力到速度
 
     // 基础物理更新方法
     virtual void update(double deltaTime);  // 根据速度更新位置
-    void applyForce(double fx, double fy);  // 施加力
-    void applyGravity(double g = 9.8);      // 重力
-
+    void applyForce(double fx, double fy);  // 累加力（不立即应用）
+    void applyGravity(double g = 9.8);      // 累加重力
+    void applyFriction(double normalForce, double frictionCoefficient);  // 应用摩擦力（相对于静止表面）
+    void applyFrictionRelative(double normalForce, double frictionCoefficient, double otherVx, double otherVy);  // 应用摩擦力（相对于运动表面）
+	
+	bool HasCollidedWithGround(double ground_y) const;
 };
 
 
@@ -107,6 +122,12 @@ public:
     // AABB特有的getter方法（const方法，不修改对象）
     double getWidth() const { return width; }
     double getHeight() const { return height; }
+
+    //AABB特有的计算摩擦力的方法
+	Shape* getCompressedShapeDown() const;
+	Shape* getCompressedShapeUp() const;
+    void applyFrictionUP();
+	void applyFrictionDOWN();
 };
 
 struct Slope : public Shape {
@@ -155,6 +176,10 @@ public:
 	void setYLevel(double y) { y_level = y; }
 	void setFriction(double f) { friction = f; }
 
+    //获取在地面上且有挤压的物体
+    Shape* getCompressedShape() const;
+
+	// 析构函数
 	~Ground() {}
 };
 

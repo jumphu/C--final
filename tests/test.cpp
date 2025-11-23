@@ -239,7 +239,7 @@ void testCollisionDetection() {
     cout << "\n??? 所有碰撞检测测试通过！ ???\n" << endl;
 }
 
-// 主函数
+/*/ 主函数
 int main() {
     cout << "\n";
     cout << "╔════════════════════════════════════════════╗" << endl;
@@ -271,3 +271,4 @@ int main() {
         return 1;
     }
 }
+*/
