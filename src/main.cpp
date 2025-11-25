@@ -2,8 +2,14 @@
 #include <iostream>
 #include <vector>
 #include <memory>
+#include <cmath>
+#include <graphics.h>
+#include <conio.h>
+#include "Renderer.h"
 
-void print_shape_info(const Shape& shape) {
+
+
+/*void print_shape_info(const Shape& shape) {
     double x, y, vx, vy;
     shape.getCentre(x, y);
     shape.getVelocity(vx, vy);
@@ -12,8 +18,10 @@ void print_shape_info(const Shape& shape) {
               << ", 质心: (" << x << ", " << y << ")"
               << ", 速度: (" << vx << ", " << vy << ")" << std::endl;
 }
-/*
+*/
+
 int main() {
+    /*
     std::cout << "=== 形状演示程序 ===" << std::endl;
     
     // 创建不同的形状对象
@@ -86,5 +94,38 @@ int main() {
     
     std::cout << "\n=== 演示结束 ===" << std::endl;
     return 0;
+    */
+    //小球参数
+    initgraph(800, 600);  // 创建窗口
+
+    int x = 400;     // 小球初始位置
+    int y = 300;
+    int r = 20;      // 小球半径
+    int dx = 3;      // 每帧移动速度
+    int dy = 3;
+
+    while (!_kbhit()) {  // 按任意键退出
+        cleardevice();   // 清屏
+
+        // 画小球
+        setfillcolor(RED);
+        solidcircle(x, y, r);
+
+        // 更新小球位置
+        x += dx;
+        y += dy;
+
+        // 碰到边缘反弹
+        if (x - r <= 0 || x + r >= 800) {
+            dx = -dx;
+        }
+        if (y - r <= 0 || y + r >= 600) {
+            dy = -dy;
+        }
+
+        Sleep(20); // 控制动画速度
+    }
+
+    closegraph();
+    return 0;
 }
-*/
