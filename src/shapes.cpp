@@ -136,6 +136,11 @@ void Shape::getTotalForce(double& fx, double& fy) const {
     fy = totalforce[1];
 }
 
+void Shape::getNormalForce(double& fx, double& fy) const {
+    fx = normalforce[0];
+    fy = normalforce[1];
+}
+
 void Shape::setMass(double m) {
     mass = m;
 }
@@ -189,13 +194,118 @@ void Shape::applyTotalForce(double deltaTime) {
     clearTotalForce();
 }
 
+void Shape::applyNormalForce(double normalForce) {
+    // 累加法向力到合力（垂直向上）
+    addToTotalForce(0.0, normalForce);
+}
+
+void Shape::checkSupportStatus(const Shape& supporter_candidate) {
+    // 检查当前物体是否被supporter_candidate支撑
+    // 判定条件：
+    // 1. 两物体发生碰撞
+    // 2. 当前物体在supporter上方
+    // 3. 垂直相对速度很小（接近静止或同步运动）
+    
+    if (!check_collision(supporter_candidate)) {
+        return; // 没有碰撞，不可能被支撑
+    }
+    
+    // 检查是否在上方（当前物体的Y坐标大于supporter）
+    if (mass_centre[1] <= supporter_candidate.mass_centre[1]) {
+        return; // 不在上方
+    }
+    
+    // 获取垂直相对速度
+    double relVy = velocity[1] - supporter_candidate.velocity[1];
+    
+    // 如果相对Y速度很小（接近0或向下速度很小），认为被支撑
+    if (std::abs(relVy) < 0.5) {  // 阈值可调整
+        isSupported = true;
+    }
+}
+
 bool Shape::HasCollidedWithGround(double ground_y) const {
-    return mass_centre[1] <= ground_y;
+    // 使用底部位置检查是否与地面碰撞
+    return getBottom() <= ground_y;
+}
+
+/*=========================================================================================================
+ * DynamicShape类方法实现
+ *=========================================================================================================*/
+
+bool DynamicShape::isMoving() const {
+    return (std::abs(velocity[0]) > 1e-6 || std::abs(velocity[1]) > 1e-6);
+}
+
+double DynamicShape::getSpeed() const {
+    return std::sqrt(velocity[0] * velocity[0] + velocity[1] * velocity[1]);
+}
+
+double DynamicShape::getKineticEnergy() const {
+    double speed = getSpeed();
+    return 0.5 * mass * speed * speed;
+}
+
+void DynamicShape::stop() {
+    velocity[0] = 0.0;
+    velocity[1] = 0.0;
+}
+
+void DynamicShape::applyImpulse(double impulseX, double impulseY) {
+    if (mass > 0.0) {
+        velocity[0] += impulseX / mass;
+        velocity[1] += impulseY / mass;
+    }
+}
+
+void DynamicShape::limitSpeed(double maxSpeed) {
+    double speed = getSpeed();
+    if (speed > maxSpeed) {
+        double ratio = maxSpeed / speed;
+        velocity[0] *= ratio;
+        velocity[1] *= ratio;
+    }
+}
+
+void DynamicShape::getMomentum(double& px, double& py) const {
+    px = mass * velocity[0];
+    py = mass * velocity[1];
+}
+
+/*=========================================================================================================
+ * StaticShape类方法实现
+ *=========================================================================================================*/
+
+void StaticShape::update(double deltaTime) {
+    // 静态物体不移动，什么都不做
+}
+
+void StaticShape::move(double dx, double dy) {
+    // 静态物体不能移动，什么都不做
+}
+
+void StaticShape::setVelocity(double vx, double vy) {
+    velocity[0] = 0.0;
+    velocity[1] = 0.0;
+}
+
+void StaticShape::setMass(double m) {
+    mass = INFINITY;
+}
+
+void StaticShape::editorMove(double dx, double dy) {
+    mass_centre[0] += dx;
+    mass_centre[1] += dy;
+}
+
+void StaticShape::editorSetCentre(double x, double y) {
+    mass_centre[0] = x;
+    mass_centre[1] = y;
 }
 
 /*=========================================================================================================
  * Circle类方法实现
- * 圆形类，继承自Shape
+ * 圆形类，继承自DynamicShape
  *=========================================================================================================*/
 
 bool Circle::check_collision(const Shape& other) const {
@@ -234,9 +344,17 @@ double Circle::getRadius() const {
     return radius;
 }
 
+double Circle::getArea() const {
+    return PI * radius * radius;
+}
+
+double Circle::getCircumference() const {
+    return 2.0 * PI * radius;
+}
+
 /*=========================================================================================================
  * AABB类方法实现
- * 轴对齐包围盒类（矩形），继承自Shape
+ * 轴对齐包围盒类（矩形），继承自DynamicShape
  *=========================================================================================================*/
 
 bool AABB::check_collision(const Shape& other) const {
@@ -269,6 +387,18 @@ bool AABB::check_collision(const Shape& other) const {
     return false;
 }
 
+double AABB::getArea() const {
+    return width * height;
+}
+
+double AABB::getPerimeter() const {
+    return 2.0 * (width + height);
+}
+
+double AABB::getDiagonal() const {
+    return std::sqrt(width * width + height * height);
+}
+
 Shape* AABB::getCompressedShapeDown() const {
     // TODO: 实现获取下方被压缩物体的逻辑
     // 这需要访问物理世界中的所有物体
@@ -283,97 +413,65 @@ Shape* AABB::getCompressedShapeUp() const {
 
 void AABB::applyFrictionUP() {
     // 获取上方被压缩的物体
-    Shape* compressedShape = getCompressedShapeUp();
+    Shape* compressedShapeUp = getCompressedShapeUp();
     
-    if (compressedShape) {
-        // 计算正压力（上方物体施加的压力）
-        double normalForce = compressedShape->getMass() * 9.8;
+    if (compressedShapeUp) {
+        // 获取上方物体给当前AABB施加的弹力
+        double fx, fy;
+        compressedShapeUp->getNormalForce(fx, fy);
         
-        // 计算摩擦力大小: f = μ * N
-        double frictionMagnitude = fraction * normalForce;
+        // 正压力就是弹力的Y分量（向下）
+        double normalForce = std::abs(fy);
         
-        // 获取两个物体的速度
-        double vx1 = velocity[0];
-        double vy1 = velocity[1];
-        double vx2, vy2;
-        compressedShape->getVelocity(vx2, vy2);
-        
-        // 计算相对速度（当前物体相对于上方物体的速度）
-        double relVx = vx1 - vx2;
-        double relVy = vy1 - vy2;
-        
-        // 计算相对速度的大小
-        double relSpeed = std::sqrt(relVx * relVx + relVy * relVy);
-        
-        // 如果相对速度几乎为零，不施加摩擦力（避免除零）
-        if (relSpeed < 1e-6) {
-            return;
+        if (normalForce < 1e-6) {
+            return; // 没有正压力，不施加摩擦力
         }
         
-        // 摩擦力方向与相对速度方向相反
-        // 归一化相对速度向量得到方向
-        double dirX = -relVx / relSpeed;  // 负号表示与相对速度相反
-        double dirY = -relVy / relSpeed;
+        // 获取上方物体速度
+        double vx2, vy2;
+        compressedShapeUp->getVelocity(vx2, vy2);
         
-        // 计算摩擦力分量
-        double frictionX = frictionMagnitude * dirX;
-        double frictionY = frictionMagnitude * dirY;
-        
-        // 累加摩擦力到合力
-        addToTotalForce(frictionX, frictionY);
+        // 使用相对速度摩擦力
+        applyFrictionRelative(normalForce, fraction, vx2, vy2);
     }
 }
 
 void AABB::applyFrictionDOWN() {
     // 获取下方被压缩的物体
-    Shape* compressedShape = getCompressedShapeDown();
+    Shape* compressedShapeDown = getCompressedShapeDown();
     
-    if (compressedShape) {
-        // 计算正压力（当前物体对下方物体的压力）
+    if (compressedShapeDown) {
+        // 获取上方被压缩的物体
+        Shape* compressedShapeUp = getCompressedShapeUp();
+        
+        // 计算正压力：自身重力 + 上方所有物体的重力
         double normalForce = mass * 9.8;
+        
+        // 如果上方有物体，累加其质量产生的压力
+        if (compressedShapeUp) {
+            normalForce += compressedShapeUp->getMass() * 9.8;
+        }
+        
+        // 保存施加到下方物体的法向力（用于下方物体计算摩擦力）
+        normalforce[0] = 0.0;
+        normalforce[1] = -normalForce;  // 向下
         
         // 使用下方物体的摩擦系数
         double otherFraction;
-        compressedShape->getFraction(otherFraction);
+        compressedShapeDown->getFraction(otherFraction);
         
-        // 计算摩擦力大小: f = μ * N
-        double frictionMagnitude = otherFraction * normalForce;
-        
-        // 获取两个物体的速度
-        double vx1 = velocity[0];
-        double vy1 = velocity[1];
+        // 获取下方物体的速度
         double vx2, vy2;
-        compressedShape->getVelocity(vx2, vy2);
+        compressedShapeDown->getVelocity(vx2, vy2);
         
-        // 计算相对速度（当前物体相对于下方物体的速度）
-        double relVx = vx1 - vx2;
-        double relVy = vy1 - vy2;
-        
-        // 计算相对速度的大小
-        double relSpeed = std::sqrt(relVx * relVx + relVy * relVy);
-        
-        // 如果相对速度几乎为零，不施加摩擦力（避免除零）
-        if (relSpeed < 1e-6) {
-            return;
-        }
-        
-        // 摩擦力方向与相对速度方向相反
-        // 归一化相对速度向量得到方向
-        double dirX = -relVx / relSpeed;  // 负号表示与相对速度相反
-        double dirY = -relVy / relSpeed;
-        
-        // 计算摩擦力分量
-        double frictionX = frictionMagnitude * dirX;
-        double frictionY = frictionMagnitude * dirY;
-        
-        // 累加摩擦力到合力
-        addToTotalForce(frictionX, frictionY);
+        // 使用相对速度摩擦力
+        applyFrictionRelative(normalForce, otherFraction, vx2, vy2);
     }
 }
 
 /*=========================================================================================================
  * Slope类方法实现
- * 斜坡类，继承自Shape
+ * 斜坡类，继承自DynamicShape
  *=========================================================================================================*/
 
 bool Slope::check_collision(const Shape& other) const {
@@ -386,14 +484,57 @@ bool Slope::check_collision(const Shape& other) const {
     return distance < length; // 简单的距离判断
 }
 
+double Slope::getAngleDegrees() const {
+    return angle * 180.0 / PI;
+}
+
+double Slope::getHeight() const {
+    return length * std::sin(angle);
+}
+
+double Slope::getBase() const {
+    return length * std::cos(angle);
+}
+
+double Slope::getSlope() const {
+    return std::tan(angle);
+}
+
 /*=========================================================================================================
  * Ground类方法实现
  *=========================================================================================================*/
 
-Shape* Ground::getCompressedShape() const {
-    // TODO: 实现获取在地面上被压缩物体的逻辑
-    // 这需要访问物理世界中的所有物体
-    return nullptr;
+bool Ground::check_collision(const Shape& other) const {
+    // 使用统一的getBottom()方法
+    return other.getBottom() <= y_level;
 }
 
-// Ground类的所有方法都在头文件中内联定义了，这里不需要重复实现
+void Ground::getNormal(double& nx, double& ny) const {
+    nx = 0.0;
+    ny = 1.0;  // 地面法向量向上
+}
+
+void Ground::applyNormalForceToUpShape(Shape& shape) {
+    // 计算支撑力（等于物体及其上方所有物体的总重力）
+    // 这里需要获取shape的normalforce，它应该包含了上方物体施加的压力
+    double fx, fy;
+    shape.getNormalForce(fx, fy);
+    
+    // 总支撑力 = 物体自身重力 + 上方物体施加的压力
+    double normalForce = shape.getMass() * 9.8 + std::abs(fy);
+    
+    // 施加向上的支撑力
+    shape.applyNormalForce(normalForce);
+}
+
+void Ground::checkAndSetSupportStatus(Shape& shape) const {
+    if (check_collision(shape)) {
+        shape.setIsSupported(true);
+    }
+}
+
+void Ground::setYLevel(double y) {
+    y_level = y;
+    mass_centre[1] = y;  // 同步更新质心Y坐标
+}
+
