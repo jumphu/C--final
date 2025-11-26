@@ -2,8 +2,34 @@
 #include "shapes.h"
 #include <iostream>
 #include <cmath>
+#include <algorithm>
+#include <string>
 
 // PhysicalWorld类的setGravity和getGravity已经在头文件中内联定义，这里不需要重复
+
+//放置物体类的实现
+void PhysicalWorld::placeDynamicShape(Shape& shape, double x_pos, double y_pos) {
+	double f = ground.getFriction();
+	shape.fraction = f;
+
+	// 尝试将shape转换为Circle
+	const Circle* circle = dynamic_cast<const Circle*>(&shape);
+	if (circle) {
+		shape.setCentre(x_pos, y_pos + circle->getRadius());
+		return;
+	}
+
+	// 尝试将shape转换为AABB
+	const AABB* aabb = dynamic_cast<const AABB*>(&shape);
+	if (aabb) {
+		shape.setCentre(x_pos, y_pos + aabb->getHeight() / 2);
+		return;
+	}
+}
+
+void PhysicalWorld::placeStaticShape(Shape& shape, double x_pos, double y_pos) {
+	shape.setCentre(x_pos, y_pos);
+}
 
 void PhysicalWorld::placeShapeOnGround(Shape& shape, const Ground& ground) {
 	double x, y;
@@ -29,13 +55,111 @@ void PhysicalWorld::placeShapeOnGround(Shape& shape, const Ground& ground) {
 
 void PhysicalWorld::start() {
 	//std::cout << "物理世界开始运行，重力加速度为: " << gravity << " m/s²" << std::endl;
+	isPaused = false;
 }
 
+/*=========================================================================================================
+ * Pause() - 暂停物理模拟
+ * 保存所有形状的当前状态，并设置暂停标志
+ *=========================================================================================================*/
+void PhysicalWorld::Pause() {
+	if (!isPaused) {
+		saveStates();
+		isPaused = true;
+		//std::cout << "物理模拟已暂停" << std::endl;
+	}
+}
+
+/*=========================================================================================================
+ * Continue() - 继续物理模拟
+ * 清除暂停标志，恢复之前保存的状态
+ *=========================================================================================================*/
+void PhysicalWorld::Continue() {
+	if (isPaused) {
+		restoreStates();
+		isPaused = false;
+		//std::cout << "物理模拟继续运行" << std::endl;
+	}
+}
+
+void PhysicalWorld::Stop() {
+	//std::cout << "物理世界停止运行。" << std::endl;
+	isPaused = false;
+	savedStates.clear();
+}
+
+/*=========================================================================================================
+ * saveStates() - 保存所有形状的状态
+ * 遍历所有动态形状，保存它们的位置、速度、质量、支撑状态等信息
+ *=========================================================================================================*/
+void PhysicalWorld::saveStates() {
+	savedStates.clear();
+	
+	for (auto& shape : dynamicShapeList) {
+		ShapeState state;
+		
+		// 保存位置
+		shape->getCentre(state.x, state.y);
+		
+		// 保存速度
+		shape->getVelocity(state.vx, state.vy);
+		
+		// 保存质量
+		state.mass = shape->getMass();
+		
+		// 保存支撑状态
+		state.isSupported = shape->getIsSupported();
+		state.supporter = shape->getSupporter();
+		
+		// 保存正压力
+		shape->getNormalForce(state.normalForce[0], state.normalForce[1]);
+		
+		savedStates.push_back(state);
+	}
+}
+
+/*=========================================================================================================
+ * restoreStates() - 恢复所有形状的状态
+ * 将之前保存的状态恢复到形状对象中
+ *=========================================================================================================*/
+void PhysicalWorld::restoreStates() {
+	if (savedStates.size() != dynamicShapeList.size()) {
+		std::cerr << "警告：保存的状态数量与当前形状数量不匹配" << std::endl;
+		return;
+	}
+	
+	for (size_t i = 0; i < dynamicShapeList.size(); i++) {
+		Shape* shape = dynamicShapeList[i];
+		const ShapeState& state = savedStates[i];
+		
+		// 恢复位置
+		shape->setCentre(state.x, state.y);
+		
+		// 恢复速度
+		shape->setVelocity(state.vx, state.vy);
+		
+		// 恢复质量（通常不需要，但保持一致性）
+		shape->setMass(state.mass);
+		
+		// 恢复支撑状态
+		shape->setIsSupported(state.isSupported);
+		shape->setSupporter(state.supporter);
+		
+		// 恢复正压力
+		shape->normalforce[0] = state.normalForce[0];
+		shape->normalforce[1] = state.normalForce[1];
+	}
+}
 /*=========================================================================================================
  * update() 函数 - 版本1：使用成员变量 timeStep
  * 简洁模式：自动使用内部时间步长
  *=========================================================================================================*/
 void PhysicalWorld::update(std::vector<Shape*>& shapeList, const Ground& ground) {
+	// 如果暂停，直接返回，不执行任何更新
+	if (isPaused) {
+		return;
+	}
+	
 	// 委托到版本2，使用成员变量 timeStep
 	update(shapeList, timeStep, ground);
 }
@@ -45,6 +169,11 @@ void PhysicalWorld::update(std::vector<Shape*>& shapeList, const Ground& ground)
  * 灵活模式：可以临时指定时间步长
  *=========================================================================================================*/
 void PhysicalWorld::update(std::vector<Shape*>& shapeList, double deltaTime, const Ground& ground) {
+	// 如果暂停，直接返回，不执行任何更新
+	if (isPaused) {
+		return;
+	}
+	
 	// ========== 第一阶段：重置支撑状态 ==========
 	resetSupportStates(shapeList);
 	
@@ -268,15 +397,12 @@ void PhysicalWorld::applyFrictionOnSupporter(Shape* shape, Shape* supporter, dou
 	}
 }
 
-void PhysicalWorld::Stop() {
-	//std::cout << "物理世界停止运行。" << std::endl;
-}
-
 /*=========================================================================================================
  * 碰撞检测和处理函数 - 检测并处理所有物体之间的碰撞
  *=========================================================================================================*/
 void PhysicalWorld::handleAllCollisions(std::vector<Shape*>& shapeList) {
 	const double MAX_INTERACTION_DISTANCE = 200.0;
+	//请增加详细注释
 	
 	for (size_t i = 0; i < shapeList.size(); i++) {
 		for (size_t j = i + 1; j < shapeList.size(); j++) {
@@ -559,4 +685,523 @@ bool PhysicalWorld::isInBounds(const Shape& shape) const {
 
 bool PhysicalWorld::checkBoundaryCollision(const Shape& shape) const {
 	return !isInBounds(shape);
+}
+
+/*=========================================================================================================
+ * 形状管理方法实现 - 添加形状
+ *=========================================================================================================*/
+void PhysicalWorld::addDynamicShape(Shape* shape) {
+	if (shape != nullptr) {
+		dynamicShapeList.push_back(shape);
+	}
+}
+
+void PhysicalWorld::addStaticShape(Shape* shape) {
+	if (shape != nullptr) {
+		staticShapeList.push_back(shape);
+	}
+}
+
+/*=========================================================================================================
+ * 形状管理方法实现 - 移除形状
+ *=========================================================================================================*/
+void PhysicalWorld::removeDynamicShape(Shape* shape) {
+	auto it = std::find(dynamicShapeList.begin(), dynamicShapeList.end(), shape);
+	if (it != dynamicShapeList.end()) {
+		dynamicShapeList.erase(it);
+	}
+}
+
+void PhysicalWorld::removeStaticShape(Shape* shape) {
+	auto it = std::find(staticShapeList.begin(), staticShapeList.end(), shape);
+	if (it != staticShapeList.end()) {
+		staticShapeList.erase(it);
+	}
+}
+
+/*=========================================================================================================
+ * 形状管理方法实现 - 通过名称查找形状
+ *=========================================================================================================*/
+Shape* PhysicalWorld::findShapeByName(const std::string& name) {
+	// 首先在动态形状中查找
+	Shape* result = findDynamicShapeByName(name);
+	if (result != nullptr) {
+		return result;
+	}
+	// 如果没找到，在静态形状中查找
+	return findStaticShapeByName(name);
+}
+
+Shape* PhysicalWorld::findDynamicShapeByName(const std::string& name) {
+	for (auto& shape : dynamicShapeList) {
+		if (shape->getName() == name) {
+			return shape;
+		}
+	}
+	return nullptr;
+}
+
+Shape* PhysicalWorld::findStaticShapeByName(const std::string& name) {
+	for (auto& shape : staticShapeList) {
+		if (shape->getName() == name) {
+			return shape;
+		}
+	}
+	return nullptr;
+}
+
+/*=========================================================================================================
+ * 形状管理方法实现 - 通过类型查找所有形状
+ *=========================================================================================================*/
+std::vector<Shape*> PhysicalWorld::findShapesByType(const std::string& type) {
+	std::vector<Shape*> result;
+	
+	// 在动态形状中查找
+	std::vector<Shape*> dynamicResult = findDynamicShapesByType(type);
+	result.insert(result.end(), dynamicResult.begin(), dynamicResult.end());
+	
+	// 在静态形状中查找
+	std::vector<Shape*> staticResult = findStaticShapesByType(type);
+	result.insert(result.end(), staticResult.begin(), staticResult.end());
+	
+	return result;
+}
+
+std::vector<Shape*> PhysicalWorld::findDynamicShapesByType(const std::string& type) {
+	std::vector<Shape*> result;
+	for (auto& shape : dynamicShapeList) {
+		if (shape->getType() == type) {
+			result.push_back(shape);
+		}
+	}
+	return result;
+}
+
+std::vector<Shape*> PhysicalWorld::findStaticShapesByType(const std::string& type) {
+	std::vector<Shape*> result;
+	for (auto& shape : staticShapeList) {
+		if (shape->getType() == type) {
+			result.push_back(shape);
+		}
+	}
+	return result;
+}
+
+/*=========================================================================================================
+ * 形状管理方法实现 - 清空所有形状
+ *=========================================================================================================*/
+void PhysicalWorld::clearDynamicShapes() {
+	dynamicShapeList.clear();
+}
+
+void PhysicalWorld::clearStaticShapes() {
+	staticShapeList.clear();
+}
+
+void PhysicalWorld::clearAllShapes() {
+	clearDynamicShapes();
+	clearStaticShapes();
+}
+
+/*=========================================================================================================
+ * 形状管理方法实现 - 打印所有形状信息（调试用）
+ *=========================================================================================================*/
+void PhysicalWorld::printAllShapes() const {
+	std::cout << "========== 物理世界中的所有形状 ==========" << std::endl;
+	std::cout << "动态形状数量: " << dynamicShapeList.size() << std::endl;
+	std::cout << "静态形状数量: " << staticShapeList.size() << std::endl;
+	std::cout << "总形状数量: " << getTotalShapeCount() << std::endl;
+	std::cout << std::endl;
+	
+	printDynamicShapes();
+	std::cout << std::endl;
+	printStaticShapes();
+}
+
+void PhysicalWorld::printDynamicShapes() const {
+	std::cout << "========== 动态形状列表 ==========" << std::endl;
+	for (size_t i = 0; i < dynamicShapeList.size(); i++) {
+		Shape* shape = dynamicShapeList[i];
+		double x, y, vx, vy;
+		shape->getCentre(x, y);
+		shape->getVelocity(vx, vy);
+		
+		std::cout << "[" << i << "] "
+		          << "名称: " << shape->getName() << ", "
+		          << "类型: " << shape->getType() << ", "
+		          << "位置: (" << x << ", " << y << "), "
+		          << "速度: (" << vx << ", " << vy << "), "
+		          << "质量: " << shape->getMass()
+		          << std::endl;
+	}
+}
+
+void PhysicalWorld::printStaticShapes() const {
+	std::cout << "========== 静态形状列表 ==========" << std::endl;
+	for (size_t i = 0; i < staticShapeList.size(); i++) {
+		Shape* shape = staticShapeList[i];
+		double x, y;
+		shape->getCentre(x, y);
+		
+		std::cout << "[" << i << "] "
+		          << "名称: " << shape->getName() << ", "
+		          << "类型: " << shape->getType() << ", "
+		          << "位置: (" << x << ", " << y << "), "
+		          << "质量: " << shape->getMass()
+		          << std::endl;
+	}
+}
+
+/*=========================================================================================================
+ * 私有方法：根据类型字符串识别并返回标准化的类型名称
+ * 
+ * 参数说明：
+ *   type - 输入的类型字符串（不区分大小写）
+ * 
+ * 返回值：
+ *   "Circle" - 如果是圆形类型
+ *   "AABB"   - 如果是矩形/盒子类型
+ *   ""       - 如果类型无法识别
+ *=========================================================================================================*/
+std::string PhysicalWorld::parseShapeType(const std::string& type) const {
+	// 转换为小写进行比较
+	std::string lowerType = type;
+	std::transform(lowerType.begin(), lowerType.end(), lowerType.begin(), ::tolower);
+	
+	// 识别圆形类型
+	if (lowerType == "circle") {
+		return "Circle";
+	}
+	// 识别矩形/盒子类型
+	else if (lowerType == "aabb" || lowerType == "box" || lowerType == "rectangle" || lowerType == "rect") {
+		return "AABB";
+	}
+	
+	// 未识别的类型
+	return "";
+}
+
+/*=========================================================================================================
+ * 私有方法：根据类型和参数创建形状对象
+ *=========================================================================================================*/
+Shape* PhysicalWorld::createShape(const std::string& type, const std::string& name,
+                                   double mass, double size1, double size2, bool isDynamic) {
+	Shape* shape = nullptr;
+	
+	// 使用 parseShapeType 识别类型
+	std::string standardType = parseShapeType(type);
+	
+	if (standardType == "Circle") {
+		// Circle: size1 = 半径
+		if (isDynamic) {
+			shape = new Circle(mass, size1, 0.0, 0.0);
+		} else {
+			Circle* circle = new Circle(mass, size1, 0.0, 0.0);
+			circle->setMass(INFINITY);  // 静态形状质量为无穷大
+			shape = circle;
+		}
+	}
+	else if (standardType == "AABB") {
+		// AABB: size1 = 宽度, size2 = 高度
+		if (size2 == 0.0) {
+			size2 = size1;  // 如果没有提供高度，默认为正方形
+		}
+		if (isDynamic) {
+			shape = new AABB(mass, size1, size2, 0.0, 0.0);
+		} else {
+			AABB* box = new AABB(mass, size1, size2, 0.0, 0.0);
+			box->setMass(INFINITY);  // 静态形状质量为无穷大
+			shape = box;
+		}
+	}
+	
+	if (shape != nullptr) {
+		// 设置名称（如果为空则自动生成）
+		if (name.empty()) {
+			shape->setName(generateUniqueName(standardType));
+		} else {
+			shape->setName(name);
+		}
+	}
+	
+	return shape;
+}
+
+/*=========================================================================================================
+ * 私有方法：生成唯一名字
+ *=========================================================================================================*/
+std::string PhysicalWorld::generateUniqueName(const std::string& type) {
+	int counter = 1;
+	std::string baseName = type;
+	std::string uniqueName;
+	
+	do {
+		uniqueName = baseName + "_" + std::to_string(counter);
+		counter++;
+	} while (isNameExists(uniqueName));
+	
+	return uniqueName;
+}
+
+/*=========================================================================================================
+ * 私有方法：检查名字是否已存在
+ *=========================================================================================================*/
+bool PhysicalWorld::isNameExists(const std::string& name) const {
+	// 在动态形状中查找
+	for (const auto& shape : dynamicShapeList) {
+		if (shape->getName() == name) {
+			return true;
+		}
+	}
+	
+	// 在静态形状中查找
+	for (const auto& shape : staticShapeList) {
+		if (shape->getName() == name) {
+			return true;
+		}
+	}
+	
+	return false;
+}
+
+/*=========================================================================================================
+ * 公共方法：通过类型创建并放置动态形状
+ *=========================================================================================================*/
+Shape* PhysicalWorld::placeDynamicShapeByType(const std::string& type, const std::string& name,
+                                                double x_pos, double y_pos,
+                                                double mass, double size1, double size2) {
+	// 创建形状
+	Shape* shape = createShape(type, name, mass, size1, size2, true);
+	
+	if (shape == nullptr) {
+		std::cerr << "错误：无法创建类型为 '" << type << "' 的形状" << std::endl;
+		return nullptr;
+	}
+	
+	// 添加到动态形状列表
+	addDynamicShape(shape);
+	
+	// 放置形状
+	placeDynamicShape(*shape, x_pos, y_pos);
+	
+	return shape;
+}
+
+/*=========================================================================================================
+ * 公共方法：通过类型创建并放置静态形状
+ *=========================================================================================================*/
+Shape* PhysicalWorld::placeStaticShapeByType(const std::string& type, const std::string& name,
+                                               double x_pos, double y_pos,
+                                               double mass, double size1, double size2) {
+	// 创建形状
+	Shape* shape = createShape(type, name, mass, size1, size2, false);
+	
+	if (shape == nullptr) {
+		std::cerr << "错误：无法创建类型为 '" << type << "' 的形状" << std::endl;
+		return nullptr;
+	}
+	
+	// 添加到静态形状列表
+	addStaticShape(shape);
+	
+	// 放置形状
+	placeStaticShape(*shape, x_pos, y_pos);
+	
+	return shape;
+}
+
+/*=========================================================================================================
+ * 公共方法：创建并放置墙壁（静态形状）
+ * 
+ * 参数说明：
+ *   name     - 墙壁的名称（如果为空则自动生成唯一名称）
+ *   x_pos    - 墙壁中心的x坐标
+ *   y_pos    - 墙壁中心的y坐标
+ *   width    - 墙壁的宽度
+ *   height   - 墙壁的高度
+ *   friction - 墙壁的摩擦系数（默认为0.0）
+ * 
+ * 返回值：
+ *   指向新创建的Wall对象的指针，如果失败则返回nullptr
+ *=========================================================================================================*/
+Wall* PhysicalWorld::placeWall(const std::string& name, double x_pos, double y_pos,
+                                 double width, double height, double friction) {
+	// 创建墙壁对象
+	Wall* wall = new Wall(width, height, x_pos, y_pos, friction);
+	
+	if (wall == nullptr) {
+		std::cerr << "错误：无法创建墙壁" << std::endl;
+		return nullptr;
+	}
+	
+	// 设置名称（如果为空则自动生成）
+	if (name.empty()) {
+		wall->setName(generateUniqueName("Wall"));
+	} else {
+		wall->setName(name);
+	}
+	
+	// 墙壁是静态形状，质量设为无穷大
+	wall->setMass(INFINITY);
+	
+	// 添加到静态形状列表
+	addStaticShape(wall);
+	
+	return wall;
+}
+
+/*=========================================================================================================
+ * 公共方法：处理动态物体与 Wall 的碰撞
+ * 
+ * 参数说明：
+ *   dynamicShape - 动态形状对象
+ *   wall         - 墙壁对象
+ * 
+ * 功能：
+ *   检测动态物体与墙壁的碰撞，如果发生碰撞则调用解决碰撞的方法
+ *=========================================================================================================*/
+void PhysicalWorld::handleWallCollision(Shape& dynamicShape, const Wall& wall) {
+	// 检查碰撞（使用Shape基类的check_collision方法）
+	if (dynamicShape.check_collision(wall)) {
+		// 解决碰撞
+		resolveCollisionWithWall(dynamicShape, wall);
+	}
+}
+
+/*=========================================================================================================
+ * 私有方法：解决动态物体与墙壁的碰撞
+ * 
+ * 参数说明：
+ *   dynamicShape - 动态形状对象
+ *   wall         - 墙壁对象
+ * 
+ * 功能：
+ *   计算碰撞响应，应用速度变化和位置修正，使物体从墙壁中分离
+ *=========================================================================================================*/
+void PhysicalWorld::resolveCollisionWithWall(Shape& dynamicShape, const Wall& wall) {
+	// 获取动态物体的位置和速度
+	double shapeX, shapeY, shapeVx, shapeVy;
+	dynamicShape.getCentre(shapeX, shapeY);
+	dynamicShape.getVelocity(shapeVx, shapeVy);
+	
+	// 获取墙壁的位置
+	double wallX, wallY;
+	wall.getCentre(wallX, wallY);
+	
+	// 获取动态物体的弹性系数
+	double restitution;
+	dynamicShape.getRestitution(restitution);
+	
+	// 计算碰撞法向量（从墙壁指向动态物体）
+	double nx = shapeX - wallX;
+	double ny = shapeY - wallY;
+	double distance = std::sqrt(nx * nx + ny * ny);
+	
+	if (distance < 0.0001) {
+		// 如果物体中心与墙壁中心重合，使用默认法向量
+		nx = 0.0;
+		ny = 1.0;
+		distance = 1.0;
+	} else {
+		// 归一化法向量
+		nx /= distance;
+		ny /= distance;
+	}
+	
+	// 计算速度在法向上的分量
+	double vn = shapeVx * nx + shapeVy * ny;
+	
+	// 如果物体正在远离墙壁，不处理碰撞
+	if (vn > 0) {
+		return;
+	}
+	
+	// 计算反弹后的速度（墙壁质量无穷大，只有动态物体速度改变）
+	double vn_new = -vn * restitution;
+	
+	// 更新速度（法向速度反弹，切向速度保持）
+	shapeVx = shapeVx - vn * nx + vn_new * nx;
+	shapeVy = shapeVy - vn * ny + vn_new * ny;
+	
+	dynamicShape.setVelocity(shapeVx, shapeVy);
+	
+	// ========== 分离物体，避免重叠 ==========
+	double overlap = 0.0;
+	
+	// 识别动态物体的类型并计算重叠量
+	const Circle* circle = dynamic_cast<const Circle*>(&dynamicShape);
+	const AABB* aabb = dynamic_cast<const AABB*>(&dynamicShape);
+	
+	if (circle) {
+		// 圆形与墙壁（矩形）碰撞
+		double circleX, circleY;
+		circle->getCentre(circleX, circleY);
+		
+		// 找到墙壁上离圆心最近的点
+		double closestX = std::max(wall.getLeft(), std::min(circleX, wall.getRight()));
+		double closestY = std::max(wall.getBottom(), std::min(circleY, wall.getTop()));
+		
+		// 计算圆心到最近点的距离
+		double dx = circleX - closestX;
+		double dy = circleY - closestY;
+		double distToClosest = std::sqrt(dx * dx + dy * dy);
+		
+		// 计算重叠量
+		overlap = circle->getRadius() - distToClosest;
+		
+		// 如果圆心在墙壁内部，使用不同的法向量
+		if (distToClosest < 0.0001) {
+			// 圆心在墙壁内部，向外推出
+			// 找到最近的墙壁边缘
+			double distLeft = circleX - wall.getLeft();
+			double distRight = wall.getRight() - circleX;
+			double distBottom = circleY - wall.getBottom();
+			double distTop = wall.getTop() - circleY;
+			
+			double minDist = std::min({distLeft, distRight, distBottom, distTop});
+			
+			if (minDist == distLeft) {
+				nx = -1.0; ny = 0.0;
+				overlap = circle->getRadius() + distLeft;
+			} else if (minDist == distRight) {
+				nx = 1.0; ny = 0.0;
+				overlap = circle->getRadius() + distRight;
+			} else if (minDist == distBottom) {
+				nx = 0.0; ny = -1.0;
+				overlap = circle->getRadius() + distBottom;
+			} else {
+				nx = 0.0; ny = 1.0;
+				overlap = circle->getRadius() + distTop;
+			}
+		} else {
+			// 更新法向量为圆心指向最近点的反方向
+			nx = dx / distToClosest;
+			ny = dy / distToClosest;
+		}
+	}
+	else if (aabb) {
+		// 矩形与墙壁（矩形）碰撞
+		double overlapX = (aabb->getWidth() + wall.getWidth()) / 2.0 - std::abs(shapeX - wallX);
+		double overlapY = (aabb->getHeight() + wall.getHeight()) / 2.0 - std::abs(shapeY - wallY);
+		
+		// 选择较小的重叠量作为分离方向
+		if (overlapX < overlapY) {
+			overlap = overlapX;
+			nx = (shapeX > wallX) ? 1.0 : -1.0;
+			ny = 0.0;
+		} else {
+			overlap = overlapY;
+			nx = 0.0;
+			ny = (shapeY > wallY) ? 1.0 : -1.0;
+		}
+	}
+	
+	// 应用位置修正（只修正动态物体）
+	if (overlap > 0) {
+		const double separationPercent = 0.8;
+		double correctionX = overlap * separationPercent * nx;
+		double correctionY = overlap * separationPercent * ny;
+		
+		dynamicShape.setCentre(shapeX + correctionX, shapeY + correctionY);
+	}
 }

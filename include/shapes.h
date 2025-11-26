@@ -3,11 +3,16 @@
 
 #include <iostream>
 #include <cmath>
+#include <string>
 
 extern const double PI;
 
 struct Shape {
 public:
+    
+    std::string name;
+    std::string type;
+    
     double mass;
     double mass_centre[2]; // mass_centre[0]: x, mass_centre[1]: y
     double velocity[2];    // velocity[0]: vx, velocity[1]: vy
@@ -24,16 +29,16 @@ public:
     */
     
     // 默认构造函数：质量为1，质心在原点，速度为0，合力为0
-    Shape() : mass(1.0), mass_centre{0.0, 0.0}, velocity{0.0, 0.0}, totalforce{0.0, 0.0}, normalforce{0.0, 0.0}, fraction(0.0), isSupported(false), supporter(nullptr) {}
+    Shape() : name("Shape"), type("Shape"), mass(1.0), mass_centre{0.0, 0.0}, velocity{0.0, 0.0}, totalforce{0.0, 0.0}, normalforce{0.0, 0.0}, fraction(0.0), isSupported(false), supporter(nullptr) {}
     
     // 单参数构造函数：指定质量，质心在原点，速度为0，合力为0
-    Shape(double m) : mass(m), mass_centre{0.0, 0.0}, velocity{0.0, 0.0}, totalforce{0.0, 0.0}, normalforce{0.0, 0.0}, fraction(0.0), isSupported(false), supporter(nullptr) {}
+    Shape(double m) : name("Shape"), type("Shape"), mass(m), mass_centre{0.0, 0.0}, velocity{0.0, 0.0}, totalforce{0.0, 0.0}, normalforce{0.0, 0.0}, fraction(0.0), isSupported(false), supporter(nullptr) {}
     
     // 三参数构造函数：指定质量和质心坐标，速度为0，合力为0
-    Shape(double m, double x, double y) : mass(m), mass_centre{x, y}, velocity{0.0, 0.0}, totalforce{0.0, 0.0}, normalforce{0.0, 0.0}, fraction(0.0), isSupported(false), supporter(nullptr) {}
+    Shape(double m, double x, double y) : name("Shape"), type("Shape"), mass(m), mass_centre{x, y}, velocity{0.0, 0.0}, totalforce{0.0, 0.0}, normalforce{0.0, 0.0}, fraction(0.0), isSupported(false), supporter(nullptr) {}
     
     // 五参数构造函数：完全指定所有属性，合力为0
-    Shape(double m, double x, double y, double vx, double vy) : mass(m), mass_centre{x, y}, velocity{vx, vy}, totalforce{0.0, 0.0}, normalforce{0.0, 0.0}, fraction(0.0), isSupported(false), supporter(nullptr) {}
+    Shape(double m, double x, double y, double vx, double vy) : name("Shape"), type("Shape"), mass(m), mass_centre{x, y}, velocity{vx, vy}, totalforce{0.0, 0.0}, normalforce{0.0, 0.0}, fraction(0.0), isSupported(false), supporter(nullptr) {}
 
     // 虚析构函数
     virtual ~Shape() {}
@@ -55,12 +60,17 @@ public:
     void getTotalForce(double& fx, double& fy) const;  // 获取当前累加的合力
     void getNormalForce(double& fx, double& fy) const; // 获取对下方物体施加的弹力
     bool getIsSupported() const { return isSupported; } // 获取是否被支撑状态
+
+    std::string getName() const { return name; }
+    std::string getType() const { return type; }
     
     // 几何查询方法 - 获取物体底部Y坐标（由子类实现）"
     virtual double getBottom() const = 0;
 	virtual double getTop() const = 0;
-    
+
     // 设置方法
+    void setName(const std::string& n) { name = n; }
+
     void setMass(double m);
     void setCentre(double x, double y);
     void setVelocity(double vx, double vy);
@@ -97,16 +107,16 @@ public:
 struct DynamicShape : public Shape {
 public:
     // 默认构造函数
-    DynamicShape() : Shape() {}
+    DynamicShape() : Shape() { type = "DynamicShape"; }
     
     // 单参数构造函数：指定质量
-    DynamicShape(double m) : Shape(m) {}
+    DynamicShape(double m) : Shape(m) { type = "DynamicShape"; }
     
     // 三参数构造函数：指定质量和位置
-    DynamicShape(double m, double x, double y) : Shape(m, x, y) {}
+    DynamicShape(double m, double x, double y) : Shape(m, x, y) { type = "DynamicShape"; }
     
     // 五参数构造函数：完全指定质量、位置、速度
-    DynamicShape(double m, double x, double y, double vx, double vy) : Shape(m, x, y, vx, vy) {}
+    DynamicShape(double m, double x, double y, double vx, double vy) : Shape(m, x, y, vx, vy) { type = "DynamicShape"; }
     
     // 虚析构函数
     virtual ~DynamicShape() {}
@@ -131,12 +141,14 @@ struct StaticShape : public Shape {
 public:
     // 默认构造函数：质量无穷大，速度为0
     StaticShape() : Shape(INFINITY, 0.0, 0.0) {
+        type = "StaticShape";
         velocity[0] = 0.0;
         velocity[1] = 0.0;
     }
     
     // 三参数构造函数：指定位置，质量无穷大
     StaticShape(double x, double y) : Shape(INFINITY, x, y) {
+        type = "StaticShape";
         velocity[0] = 0.0;
         velocity[1] = 0.0;
     }
@@ -166,11 +178,11 @@ public:
     double radius;
 
     // 构造函数
-    Circle() : DynamicShape(), radius(1.0) {}
-    Circle(double r) : DynamicShape(), radius(r) {}
-    Circle(double r, double x, double y) : DynamicShape(1.0, x, y), radius(r) {}
-    Circle(double m, double r, double x, double y) : DynamicShape(m, x, y), radius(r) {}
-    Circle(double m, double r, double x, double y, double vx, double vy) : DynamicShape(m, x, y, vx, vy), radius(r) {}
+    Circle() : DynamicShape(), radius(1.0) { type = "Circle"; name = "Circle"; }
+    Circle(double r) : DynamicShape(), radius(r) { type = "Circle"; name = "Circle"; }
+    Circle(double r, double x, double y) : DynamicShape(1.0, x, y), radius(r) { type = "Circle"; name = "Circle"; }
+    Circle(double m, double r, double x, double y) : DynamicShape(m, x, y), radius(r) { type = "Circle"; name = "Circle"; }
+    Circle(double m, double r, double x, double y, double vx, double vy) : DynamicShape(m, x, y, vx, vy), radius(r) { type = "Circle"; name = "Circle"; }
 
     // 覆写父类的方法
     virtual bool check_collision(const Shape& other) const override;
@@ -194,11 +206,11 @@ public:
     double height;
 
     // 构造函数
-    AABB() : DynamicShape(), width(1.0), height(1.0) {}
-    AABB(double w, double h) : DynamicShape(), width(w), height(h) {}
-    AABB(double w, double h, double x, double y) : DynamicShape(1.0, x, y), width(w), height(h) {}
-    AABB(double m, double w, double h, double x, double y) : DynamicShape(m, x, y), width(w), height(h) {}
-    AABB(double m, double w, double h, double x, double y, double vx, double vy) : DynamicShape(m, x, y, vx, vy), width(w), height(h) {}
+    AABB() : DynamicShape(), width(1.0), height(1.0) { type = "AABB"; name = "AABB"; }
+    AABB(double w, double h) : DynamicShape(), width(w), height(h) { type = "AABB"; name = "AABB"; }
+    AABB(double w, double h, double x, double y) : DynamicShape(1.0, x, y), width(w), height(h) { type = "AABB"; name = "AABB"; }
+    AABB(double m, double w, double h, double x, double y) : DynamicShape(m, x, y), width(w), height(h) { type = "AABB"; name = "AABB"; }
+    AABB(double m, double w, double h, double x, double y, double vx, double vy) : DynamicShape(m, x, y, vx, vy), width(w), height(h) { type = "AABB"; name = "AABB"; }
 
     // 覆写父类的方法
     virtual bool check_collision(const Shape& other) const override;
@@ -234,11 +246,11 @@ public:
     double angle; // 斜坡与水平线的夹角，单位为弧度
     
     // 构造函数
-    Slope() : DynamicShape(), length(1.0), angle(0.0) {}
-    Slope(double l, double a) : DynamicShape(), length(l), angle(a) {}
-    Slope(double l, double a, double x, double y) : DynamicShape(1.0, x, y), length(l), angle(a) {}
-    Slope(double m, double l, double a, double x, double y) : DynamicShape(m, x, y), length(l), angle(a) {}
-    Slope(double m, double l, double a, double x, double y, double vx, double vy) : DynamicShape(m, x, y, vx, vy), length(l), angle(a) {}
+    Slope() : DynamicShape(), length(1.0), angle(0.0) { type = "Slope"; name = "Slope"; }
+    Slope(double l, double a) : DynamicShape(), length(l), angle(a) { type = "Slope"; name = "Slope"; }
+    Slope(double l, double a, double x, double y) : DynamicShape(1.0, x, y), length(l), angle(a) { type = "Slope"; name = "Slope"; }
+    Slope(double m, double l, double a, double x, double y) : DynamicShape(m, x, y), length(l), angle(a) { type = "Slope"; name = "Slope"; }
+    Slope(double m, double l, double a, double x, double y, double vx, double vy) : DynamicShape(m, x, y, vx, vy), length(l), angle(a) { type = "Slope"; name = "Slope"; }
 
     // 覆写父类的方法
     virtual bool check_collision(const Shape& other) const override;
@@ -263,9 +275,9 @@ public:
 	double y_level;   // 地面的y坐标（与mass_centre[1]同步）"
 
     // 构造函数
-	Ground() : StaticShape(0.0, 0.0), y_level(0.0) { fraction = 0.0; }
-	Ground(double y) : StaticShape(0.0, y), y_level(y) { fraction = 0.0; }
-	Ground(double y, double f) : StaticShape(0.0, y), y_level(y) { fraction = f; }
+	Ground() : StaticShape(0.0, 0.0), y_level(0.0) { type = "Ground"; name = "Ground"; fraction = 0.0; }
+	Ground(double y) : StaticShape(0.0, y), y_level(y) { type = "Ground"; name = "Ground"; fraction = 0.0; }
+	Ground(double y, double f) : StaticShape(0.0, y), y_level(y) { type = "Ground"; name = "Ground"; fraction = f; }
 
 	// Getter方法
 	double getYLevel() const { return y_level; }
@@ -291,11 +303,64 @@ public:
 	virtual ~Ground() {}
 };
 
+/*=========================================================================================================
+ * Wall - 墙壁类（静态形状）
+ * 矩形墙壁，不能移动，质量无穷大，用于边界和障碍物
+ *=========================================================================================================*/
 struct Wall : public StaticShape {
-public :
+public:
+    double width;
+    double height;
+
+    // 构造函数
+    Wall() : StaticShape(), width(1.0), height(1.0) { 
+        type = "Wall"; 
+        name = "Wall"; 
+        fraction = 0.0;  // 默认无摩擦
+    }
     
+    Wall(double w, double h) : StaticShape(), width(w), height(h) { 
+        type = "Wall"; 
+        name = "Wall"; 
+        fraction = 0.0;
+    }
+    
+    Wall(double w, double h, double x, double y) : StaticShape(x, y), width(w), height(h) { 
+        type = "Wall"; 
+        name = "Wall"; 
+        fraction = 0.0;
+    }
+    
+    Wall(double w, double h, double x, double y, double f) : StaticShape(x, y), width(w), height(h) { 
+        type = "Wall"; 
+        name = "Wall"; 
+        fraction = f;
+    }
 
+    // 覆写父类方法
+    virtual bool check_collision(const Shape& other) const override;
+    virtual double getBottom() const override { return mass_centre[1] - height / 2.0; }
+    virtual double getTop() const override { return mass_centre[1] + height / 2.0; }
+    
+    // Wall特有的getter方法
+    double getWidth() const { return width; }
+    double getHeight() const { return height; }
+    double getLeft() const { return mass_centre[0] - width / 2.0; }
+    double getRight() const { return mass_centre[0] + width / 2.0; }
+    
+    // 几何计算方法
+    double getArea() const;
+    double getPerimeter() const;
+    double getDiagonal() const;
+    
+    // 检查点是否在墙内
+    bool containsPoint(double x, double y) const;
+    
+    // 获取到点的最近距离
+    double distanceToPoint(double x, double y) const;
 
+    // 虚析构函数
+    virtual ~Wall() {}
 };
 
 
