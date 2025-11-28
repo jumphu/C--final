@@ -1,29 +1,20 @@
-cmake_minimum_required(VERSION 3.16)
-
-project(ProjectC VERSION 1.0.0 LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.20)
+project(ProjectC)
 
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# 设置输出目录
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
+# 你的 include 目录
+include_directories("C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Auxiliary/VS/include")
 
-# 包含目录
-include_directories(${PROJECT_SOURCE_DIR}/include)
+# 你的 lib 目录（必须指向 easyxa.lib 所在目录）
+link_directories("C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Auxiliary/VS/lib/x64")
 
-# 创建shapes库
-add_library(shapes src/shapes.cpp)
-target_include_directories(shapes PUBLIC ${PROJECT_SOURCE_DIR}/include)
+# 源代码
+add_executable(ProjectC
+    src/main.cpp
+ "src/shapes.h")
 
-# 主程序
-add_executable(shape_demo src/main.cpp)
-target_link_libraries(shape_demo shapes)
-
-# 简单EasyX演示
-add_executable(simple_easyx_demo examples/simple_easyx_demo.cpp)
-target_link_libraries(simple_easyx_demo shapes)
-
-# 如果在Windows上，尝试链接EasyX库
-if(WIN32)
-    target_link_libraries(simple_easyx_demo graphics)
-endif()
+# 链接你真正拥有的库
+target_link_libraries(ProjectC
+    EasyXa.lib        # 你确认存在
+)
