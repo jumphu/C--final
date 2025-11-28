@@ -222,8 +222,6 @@ void Shape::checkSupportStatus(const Shape& supporter_candidate) {
     // 如果相对Y速度很小（接近0或向下速度很小），认为被支撑
     if (std::abs(relVy) < 0.5) {  // 阈值可调整
         isSupported = true;
-        // ✅ 修复：设置支撑者指针
-        supporter = const_cast<Shape*>(&supporter_candidate);
     }
 }
 
@@ -319,8 +317,7 @@ bool Circle::check_collision(const Shape& other) const {
         double dx = mass_centre[0] - other_circle->mass_centre[0];
         double dy = mass_centre[1] - other_circle->mass_centre[1];
         double distance = std::sqrt(dx * dx + dy * dy);
-        // ✅ 修复：使用 <= 以包含相切情况
-        return distance <= (radius + other_circle->radius);
+        return distance < (radius + other_circle->radius);
     }
     
     // 尝试将other转换为AABB
@@ -336,8 +333,7 @@ bool Circle::check_collision(const Shape& other) const {
         double dy = mass_centre[1] - closest_y;
         double distance = std::sqrt(dx * dx + dy * dy);
         
-        // ✅ 修复：使用 <= 以包含相切情况
-        return distance <= radius;
+        return distance < radius;
     }
     
     // 尝试将other转换为Wall（静态矩形障碍物）
@@ -538,8 +534,45 @@ void AABB::applyFrictionDOWN() {
  *=========================================================================================================*/
 
 bool Slope::check_collision(const Shape& other) const {
+    // Slope 作为静态物体，只检测与其他静态物体的碰撞（用于编辑器）
+    // 动态物体会自己检测与 Slope 的碰撞
+    
+    // 尝试将other转换为Slope
+    const Slope* other_slope = dynamic_cast<const Slope*>(&other);
+    if (other_slope) {
+        // Slope与Slope的碰撞检测（简化：使用质心距离）
+        double dx = mass_centre[0] - other_slope->mass_centre[0];
+        double dy = mass_centre[1] - other_slope->mass_centre[1];
+        double distance = std::sqrt(dx * dx + dy * dy);
+        
+        // 如果距离小于两个斜坡的长度之和，认为可能重叠
+        return distance < (length + other_slope->length) / 2.0;
+    }
+    
+    // 尝试将other转换为Wall
+    const Wall* other_wall = dynamic_cast<const Wall*>(&other);
+    if (other_wall) {
+        // Slope与Wall的碰撞检测（简化版本）
+        double dx = mass_centre[0] - other_wall->mass_centre[0];
+        double dy = mass_centre[1] - other_wall->mass_centre[1];
+        double distance = std::sqrt(dx * dx + dy * dy);
+        
+        // 简化判定
+        return distance < (length + other_wall->getWidth() + other_wall->getHeight()) / 2.0;
+    }
+    
     // Slope 不主动检测与动态物体的碰撞
     return false;
+}
+
+double Slope::getBottom() const {
+    // 斜坡底部是质心位置（简化）
+    return mass_centre[1];
+}
+
+double Slope::getTop() const {
+    // 斜坡顶部 = 质心 + 高度
+    return mass_centre[1] + getHeight();
 }
 
 double Slope::getAngleDegrees() const {
@@ -596,6 +629,50 @@ void Ground::setYLevel(double y) {
     mass_centre[1] = y;  // 同步更新质心Y坐标
 }
 
+/*=========================================================================================================
+ * Wall类方法实现
+ * 墙壁是静态矩形障碍物
+ * 注意：Wall 作为静态物体，只检测与其他静态物体的碰撞（用于编辑器）
+ *       动态物体会检测与 Wall 的碰撞，但 Wall 本身不主动检测动态物体
+ *=========================================================================================================*/
+
+bool Wall::check_collision(const Shape& other) const {
+    // 静态物体（Wall）只检测与其他静态物体的碰撞
+    // 这个函数主要用于编辑器或特殊场景中的静态物体布局检测
+    
+    // 尝试将other转换为Wall
+    const Wall* other_wall = dynamic_cast<const Wall*>(&other);
+    if (other_wall) {
+        // Wall与Wall的碰撞检测（AABB算法）
+        double left1 = getLeft();
+        double right1 = getRight();
+        double top1 = getTop();
+        double bottom1 = getBottom();
+        
+        double left2 = other_wall->getLeft();
+        double right2 = other_wall->getRight();
+        double top2 = other_wall->getTop();
+        double bottom2 = other_wall->getBottom();
+        
+        return !(left1 > right2 || right1 < left2 || bottom1 > top2 || top1 < bottom2);
+    }
+    
+    // 尝试将other转换为Slope（静态斜坡）
+    const Slope* other_slope = dynamic_cast<const Slope*>(&other);
+    if (other_slope) {
+        // Wall与Slope的碰撞检测（简化）
+        double dx = other_slope->mass_centre[0] - mass_centre[0];
+        double dy = other_slope->mass_centre[1] - mass_centre[1];
+        double distance = std::sqrt(dx * dx + dy * dy);
+        
+        // 简化判定
+        return distance < (width + height + other_slope->getLength()) / 2.0;
+    }
+    
+    // Wall 不主动检测与动态物体的碰撞
+    return false;
+}
+
 double Wall::getArea() const {
     return width * height;
 }
@@ -617,80 +694,5 @@ double Wall::distanceToPoint(double x, double y) const {
     double dx = std::max(getLeft() - x, std::max(0.0, x - getRight()));
     double dy = std::max(getBottom() - y, std::max(0.0, y - getTop()));
     return std::sqrt(dx * dx + dy * dy);
-}
-
-/*=========================================================================================================
- * Wall::check_collision - 检测墙壁与其他形状的碰撞
- * 
- * 墙壁是静态矩形，需要与各种动态形状进行碰撞检测
- *=========================================================================================================*/
-bool Wall::check_collision(const Shape& other) const {
-    // 尝试将other转换为Circle
-    const Circle* other_circle = dynamic_cast<const Circle*>(&other);
-    if (other_circle) {
-        // 墙壁（矩形）与圆形的碰撞检测
-        // 找到墙壁上离圆心最近的点
-        double circleX, circleY;
-        other_circle->getCentre(circleX, circleY);
-        
-        double closestX = std::max(getLeft(), std::min(circleX, getRight()));
-        double closestY = std::max(getBottom(), std::min(circleY, getTop()));
-        
-        double dx = circleX - closestX;
-        double dy = circleY - closestY;
-        double distance = std::sqrt(dx * dx + dy * dy);
-        
-        return distance < other_circle->getRadius();
-    }
-    
-    // 尝试将other转换为AABB
-    const AABB* other_aabb = dynamic_cast<const AABB*>(&other);
-    if (other_aabb) {
-        // 墙壁（矩形）与AABB（矩形）的碰撞检测
-        double left1 = getLeft();
-        double right1 = getRight();
-        double top1 = getTop();
-        double bottom1 = getBottom();
-        
-        double left2 = other_aabb->getLeft();
-        double right2 = other_aabb->getRight();
-        double top2 = other_aabb->getTop();
-        double bottom2 = other_aabb->getBottom();
-        
-        return !(left1 > right2 || right1 < left2 || bottom1 > top2 || top1 < bottom2);
-    }
-    
-    // 尝试将other转换为Wall
-    const Wall* other_wall = dynamic_cast<const Wall*>(&other);
-    if (other_wall) {
-        // 墙壁与墙壁的碰撞检测（矩形与矩形）
-        double left1 = getLeft();
-        double right1 = getRight();
-        double top1 = getTop();
-        double bottom1 = getBottom();
-        
-        double left2 = other_wall->getLeft();
-        double right2 = other_wall->getRight();
-        double top2 = other_wall->getTop();
-        double bottom2 = other_wall->getBottom();
-        
-        return !(left1 > right2 || right1 < left2 || bottom1 > top2 || top1 < bottom2);
-    }
-    
-    // 尝试将other转换为Slope（静态斜坡）
-    const Slope* other_slope = dynamic_cast<const Slope*>(&other);
-    if (other_slope) {
-        // 墙壁与斜坡的碰撞检测（简化版本）
-        double dx = mass_centre[0] - other_slope->mass_centre[0];
-        double dy = mass_centre[1] - other_slope->mass_centre[1];
-        double distance = std::sqrt(dx * dx + dy * dy);
-        
-        // 简化判定：如果距离小于墙壁对角线的一半 + 斜坡长度的一半
-        double wallRadius = getDiagonal() / 2.0;
-        return distance < (wallRadius + other_slope->getLength() / 2.0);
-    }
-    
-    // 无法识别的类型，返回false
-    return false;
 }
 
