@@ -16,7 +16,8 @@ public:
     double mass;
     double mass_centre[2]; // mass_centre[0]: x, mass_centre[1]: y
     double velocity[2];    // velocity[0]: vx, velocity[1]: vy
-	double fraction;      // 摩擦系数
+	double fraction;      // 动摩擦系数 (kinetic friction)
+    double static_fraction; // 静摩擦系数 (static friction)
 	double restitution = 1; // 恢复系数，默认值为1
     double totalforce[2];  // 合力累加器: totalforce[0]: fx, totalforce[1]: fy
     double normalforce[2]; // 给下方物体施加的弹力: normalforce[0]: fx, normalforce[1]: fy
@@ -29,16 +30,16 @@ public:
     */
     
     // 默认构造函数：质量为1，质心在原点，速度为0，合力为0
-    Shape() : name("Shape"), type("Shape"), mass(1.0), mass_centre{0.0, 0.0}, velocity{0.0, 0.0}, totalforce{0.0, 0.0}, normalforce{0.0, 0.0}, fraction(0.0), isSupported(false), supporter(nullptr) {}
+    Shape() : name("Shape"), type("Shape"), mass(1.0), mass_centre{0.0, 0.0}, velocity{0.0, 0.0}, totalforce{0.0, 0.0}, normalforce{0.0, 0.0}, fraction(0.0), static_fraction(0.0), isSupported(false), supporter(nullptr) {}
     
     // 单参数构造函数：指定质量，质心在原点，速度为0，合力为0
-    Shape(double m) : name("Shape"), type("Shape"), mass(m), mass_centre{0.0, 0.0}, velocity{0.0, 0.0}, totalforce{0.0, 0.0}, normalforce{0.0, 0.0}, fraction(0.0), isSupported(false), supporter(nullptr) {}
+    Shape(double m) : name("Shape"), type("Shape"), mass(m), mass_centre{0.0, 0.0}, velocity{0.0, 0.0}, totalforce{0.0, 0.0}, normalforce{0.0, 0.0}, fraction(0.0), static_fraction(0.0), isSupported(false), supporter(nullptr) {}
     
     // 三参数构造函数：指定质量和质心坐标，速度为0，合力为0
-    Shape(double m, double x, double y) : name("Shape"), type("Shape"), mass(m), mass_centre{x, y}, velocity{0.0, 0.0}, totalforce{0.0, 0.0}, normalforce{0.0, 0.0}, fraction(0.0), isSupported(false), supporter(nullptr) {}
+    Shape(double m, double x, double y) : name("Shape"), type("Shape"), mass(m), mass_centre{x, y}, velocity{0.0, 0.0}, totalforce{0.0, 0.0}, normalforce{0.0, 0.0}, fraction(0.0), static_fraction(0.0), isSupported(false), supporter(nullptr) {}
     
     // 五参数构造函数：完全指定所有属性，合力为0
-    Shape(double m, double x, double y, double vx, double vy) : name("Shape"), type("Shape"), mass(m), mass_centre{x, y}, velocity{vx, vy}, totalforce{0.0, 0.0}, normalforce{0.0, 0.0}, fraction(0.0), isSupported(false), supporter(nullptr) {}
+    Shape(double m, double x, double y, double vx, double vy) : name("Shape"), type("Shape"), mass(m), mass_centre{x, y}, velocity{vx, vy}, totalforce{0.0, 0.0}, normalforce{0.0, 0.0}, fraction(0.0), static_fraction(0.0), isSupported(false), supporter(nullptr) {}
 
     // 虚析构函数
     virtual ~Shape() {}
@@ -56,10 +57,11 @@ public:
     void getCentre(double& x, double& y) const;
     void getVelocity(double& vx, double& vy) const;
 	void getFraction(double& f) const;
+    void getStaticFraction(double& sf) const { sf = static_fraction; }
 	void getRestitution(double& r) const;
-    void getTotalForce(double& fx, double& fy) const;  // 获取当前累加的合力
-    void getNormalForce(double& fx, double& fy) const; // 获取对下方物体施加的弹力
-    bool getIsSupported() const { return isSupported; } // 获取是否被支撑状态
+    void getTotalForce(double& fx, double& fy) const;
+    void getNormalForce(double& fx, double& fy) const;
+    bool getIsSupported() const { return isSupported; }
 
     std::string getName() const { return name; }
     std::string getType() const { return type; }
@@ -75,6 +77,7 @@ public:
     void setCentre(double x, double y);
     void setVelocity(double vx, double vy);
 	void setFraction(double f) { fraction = f; }
+    void setStaticFraction(double sf) { static_fraction = sf; }
 	void setRestitution(double r) { restitution = r; }
     void setIsSupported(bool supported) { isSupported = supported; } // 设置支撑状态
 
@@ -87,8 +90,9 @@ public:
     virtual void update(double deltaTime);  // 根据速度更新位置
     void applyForce(double fx, double fy);  // 累加力（不立即应用）
     void applyGravity(double g = 9.8);      // 累加重力
-    void applyFriction(double normalForce, double frictionCoefficient);  // 应用摩擦力（相对于静止表面）
-    void applyFrictionRelative(double normalForce, double frictionCoefficient, double otherVx, double otherVy);  // 应用摩擦力（相对于运动表面）"
+    void applyFriction(double normalForce, double kineticFriction, double staticFriction, double drivingForce);  // 应用摩擦力（区分静摩擦和动摩擦）
+    void applyFrictionRelative(double normalForce, double kineticFriction, double staticFriction, double otherVx, double otherVy, double drivingForce);  // 应用相对摩擦力
+
 	void applyNormalForce(double normalForce);  // 应用支撑力（垂直向上）
 	
     // 支撑状态判定方法
@@ -275,18 +279,21 @@ public:
 	double y_level;   // 地面的y坐标（与mass_centre[1]同步）"
 
     // 构造函数
-	Ground() : StaticShape(0.0, 0.0), y_level(0.0) { type = "Ground"; name = "Ground"; fraction = 0.0; }
-	Ground(double y) : StaticShape(0.0, y), y_level(y) { type = "Ground"; name = "Ground"; fraction = 0.0; }
-	Ground(double y, double f) : StaticShape(0.0, y), y_level(y) { type = "Ground"; name = "Ground"; fraction = f; }
+	Ground() : StaticShape(0.0, 0.0), y_level(0.0) { type = "Ground"; name = "Ground"; fraction = 0.0; static_fraction = 0.0; }
+	Ground(double y) : StaticShape(0.0, y), y_level(y) { type = "Ground"; name = "Ground"; fraction = 0.0; static_fraction = 0.0; }
+	Ground(double y, double f) : StaticShape(0.0, y), y_level(y) { type = "Ground"; name = "Ground"; fraction = f; static_fraction = f; }
+	Ground(double y, double f, double sf) : StaticShape(0.0, y), y_level(y) { type = "Ground"; name = "Ground"; fraction = f; static_fraction = sf; }
 
 	// Getter方法
 	double getYLevel() const { return y_level; }
 	double getFriction() const { return fraction; }
+    double getStaticFriction() const { return static_fraction; }
     double getWidth() const { return INFINITY; }
 
 	// Setter方法
 	void setYLevel(double y);
-	void setFriction(double f) { fraction = f; }
+	void setFriction(double f) { fraction = f; static_fraction = f; }
+    void setFriction(double f, double sf) { fraction = f; static_fraction = sf; }
     
     // 覆写父类方法
     virtual bool check_collision(const Shape& other) const override;
@@ -335,6 +342,14 @@ public:
         type = "Wall"; 
         name = "Wall"; 
         fraction = f;
+        static_fraction = f; // 静摩擦系数默认等于动摩擦系数
+    }
+    
+    Wall(double w, double h, double x, double y, double f, double sf) : StaticShape(x, y), width(w), height(h) { 
+        type = "Wall"; 
+        name = "Wall"; 
+        fraction = f;
+        static_fraction = sf;
     }
 
     // 覆写父类方法

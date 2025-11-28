@@ -247,7 +247,7 @@ void test_multiple_bounces() {
     int bounceCount = 0;
     double lastVx = 8.0;
     
-    for (int i = 0; i < 200; i++) {
+    for (int i = 0; i < 400; i++) {
         // 手动更新位置
         ball->setCentre(ball->mass_centre[0] + ball->velocity[0] * 0.05, 
                        ball->mass_centre[1]);

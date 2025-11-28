@@ -1,5 +1,4 @@
 ﻿#include "physicalWorld.h"
-#include "shapes.h"
 #include <iostream>
 #include <cmath>
 #include <algorithm>
@@ -51,118 +50,6 @@ void PhysicalWorld::placeShapeOnGround(Shape& shape, const Ground& ground) {
 		shape.setCentre(x, ground.getYLevel() + aabb->getHeight() / 2);
 		return;
 	}
-}
-
-/*=========================================================================================================
- * placeShapeOnShape() - 将一个形状放置在另一个形状的上方
- * 
- * 参数说明：
- *   topShape    - 要放置在上方的形状
- *   bottomShape - 底部支撑的形状
- *   offsetX     - 水平偏移量（相对于底部形状中心，默认0表示居中对齐）
- * 
- * 功能：
- *   1. 计算底部形状的顶部位置
- *   2. 计算上方形状应该放置的位置（考虑形状类型和大小）
- *   3. 设置上方形状的摩擦系数与底部形状相同
- *   4. 支持在倾斜坐标系中的放置（考虑 inclineAngle）
- * 
- * 支持的形状组合：
- *   - Circle 在 Circle 上
- *   - Circle 在 AABB 上
- *   - AABB 在 Circle 上
- *   - AABB 在 AABB 上
- *   - Circle 在 Wall 上
- *   - AABB 在 Wall 上
- *=========================================================================================================*/
-void PhysicalWorld::placeShapeOnShape(Shape& topShape, Shape& bottomShape, double offsetX) {
-	// 1. 获取底部形状的信息
-	double bottomX, bottomY;
-	bottomShape.getCentre(bottomX, bottomY);
-	double bottomTop = bottomShape.getTop();  // 底部形状的顶部Y坐标
-	
-	// 2. 获取底部形状的摩擦系数并设置给上方形状
-	double friction;
-	bottomShape.getFraction(friction);
-	topShape.setFraction(friction);
-	
-	double staticFriction;
-	bottomShape.getStaticFraction(staticFriction);
-	topShape.setStaticFraction(staticFriction);
-	
-	// 3. 计算上方形状的底部Y坐标（应该放置的位置）
-	double topShapeBottom = topShape.getBottom();  // 当前底部位置
-	double topShapeY;
-	topShape.getCentre(topShapeY, topShapeY);  // 获取当前中心Y坐标
-	
-	// 计算从中心到底部的距离
-	double centerToBottom = topShapeY - topShapeBottom;
-	
-	// 4. 计算新的中心位置
-	double newY = bottomTop + centerToBottom;  // 新的中心Y坐标
-	double newX = bottomX + offsetX;            // 新的中心X坐标
-	
-	// 5. 考虑倾斜角度的修正
-	// 在倾斜坐标系中，"垂直"方向实际上是垂直于斜面的方向
-	if (std::abs(inclineAngle) > 0.01) {
-		// 将坐标转换到倾斜坐标系，然后再转换回标准坐标系
-		const double PI = 3.14159265358979323846;
-		double angleRad = inclineAngle * PI / 180.0;
-		
-		// 在倾斜坐标系中，垂直堆叠意味着沿着法向量方向
-		// 法向量：(-sin(θ), cos(θ))
-		double normalX = -std::sin(angleRad);
-		double normalY = std::cos(angleRad);
-		
-		// 计算底部形状顶部到上方形状底部的距离
-		double distance = centerToBottom * 2.0;  // 上方形状的高度/直径
-		
-		// 识别上方形状的类型以获取准确的尺寸
-		const Circle* topCircle = dynamic_cast<const Circle*>(&topShape);
-		const AABB* topAABB = dynamic_cast<const AABB*>(&topShape);
-		
-		if (topCircle) {
-			distance = topCircle->getRadius();
-		} else if (topAABB) {
-			distance = topAABB->getHeight() / 2.0;
-		}
-		
-		// 识别底部形状的类型
-		const Circle* bottomCircle = dynamic_cast<const Circle*>(&bottomShape);
-		const AABB* bottomAABB = dynamic_cast<const AABB*>(&bottomShape);
-		const Wall* bottomWall = dynamic_cast<const Wall*>(&bottomShape);
-		
-		double bottomDistance = 0.0;
-		if (bottomCircle) {
-			bottomDistance = bottomCircle->getRadius();
-		} else if (bottomAABB) {
-			bottomDistance = bottomAABB->getHeight() / 2.0;
-		} else if (bottomWall) {
-			bottomDistance = bottomWall->getHeight() / 2.0;
-		}
-		
-		// 计算总的垂直距离（沿法向量方向）
-		double totalDistance = bottomDistance + distance + 0.01;  // 加上小间隙避免初始重叠
-		
-		// 沿法向量方向放置
-		newX = bottomX + offsetX + totalDistance * normalX;
-		newY = bottomY + totalDistance * normalY;
-	} else {
-		// 水平情况下，添加小间隙避免初始重叠
-		newY += 0.01;
-	}
-	
-	// 6. 设置上方形状的新位置
-	topShape.setCentre(newX, newY);
-	
-	// 7. 可选：打印调试信息
-	#ifdef DEBUG_PLACEMENT
-	std::cout << "放置形状: " << topShape.getName() 
-	          << " 在 " << bottomShape.getName() << " 上方" << std::endl;
-	std::cout << "  位置: (" << newX << ", " << newY << ")" << std::endl;
-	std::cout << "  偏移: " << offsetX << std::endl;
-	std::cout << "  倾斜角度: " << inclineAngle << "°" << std::endl;
-	#endif
 }
 
 void PhysicalWorld::start() {
@@ -286,6 +173,12 @@ void PhysicalWorld::update(std::vector<Shape*>& shapeList, double deltaTime, con
 		return;
 	}
 	
+	// ========== 预先计算垂直重力分量 ==========
+	// 在所有阶段之前计算，供后续使用
+	const double PI = 3.14159265358979323846;
+	double angleRad = inclineAngle * PI / 180.0;
+	gravity_vertical = gravity * std::cos(angleRad);  // 垂直于斜面的分量
+	
 	// ========== 第一阶段：重置支撑状态 ==========
 	resetSupportStates(shapeList);
 	
@@ -360,10 +253,9 @@ void PhysicalWorld::calculateNormalForceRecursive(Shape* shape, std::vector<Shap
 		return;
 	}
 	
-	// 计算自身在垂直于斜面方向的重力分量
-	const double PI = 3.14159265358979323846;
-	double angleRad = inclineAngle * PI / 180.0;
-	double totalWeight = shape->getMass() * gravity * std::cos(angleRad);
+	// 计算自身重力（使用垂直分量）
+	// 在倾斜时，正压力应该使用垂直于斜面的重力分量
+	double totalWeight = shape->getMass() * gravity_vertical;
 	
 	// 查找压在这个物体上面的所有物体
 	for (auto& other : shapeList) {
@@ -386,15 +278,19 @@ void PhysicalWorld::calculateNormalForceRecursive(Shape* shape, std::vector<Shap
  * 根据物体的支撑状态，施加相应的力并更新速度和位置
  *=========================================================================================================*/
 void PhysicalWorld::updatePhysics(std::vector<Shape*>& shapeList, double deltaTime, const Ground& ground) {
+	// gravity_vertical 已经在 update() 函数中计算过了，这里直接使用
+	
 	for (auto& shape : shapeList) {
 		// 清空上一帧的力累加器
 		shape->clearTotalForce();
 		
-		// 根据支撑状态分别处理
+		// 统一使用倾斜重力系统（即使角度为0也使用，保证逻辑一致）
 		if (shape->getIsSupported()) {
-			handleSupportedShape(shape, deltaTime, ground);
+			// 被支撑的物体
+			handleSupportedShapeWithGravity(shape, deltaTime, ground);
 		} else {
-			handleAirborneShape(shape, deltaTime);
+			// 空中的物体
+			handleAirborneShapeWithGravity(shape, deltaTime);
 		}
 		
 		// 应用累加的力到速度
@@ -409,9 +305,9 @@ void PhysicalWorld::updatePhysics(std::vector<Shape*>& shapeList, double deltaTi
 }
 
 /*=========================================================================================================
- * 处理被支撑的物体（在地面或其他物体上）
+ * 处理被支撑的物体（统一处理，包含倾斜角度）
  *=========================================================================================================*/
-void PhysicalWorld::handleSupportedShape(Shape* shape, double deltaTime, const Ground& ground) {
+void PhysicalWorld::handleSupportedShapeWithGravity(Shape* shape, double deltaTime, const Ground& ground) {
 	// 获取当前位置和速度
 	double x, y, vx, vy;
 	shape->getCentre(x, y);
@@ -433,72 +329,72 @@ void PhysicalWorld::handleSupportedShape(Shape* shape, double deltaTime, const G
 	}
 	shape->setVelocity(vx, vy);
 	
-	// 2.5. 计算沿斜面的重力分量（驱动力），但先不施加
-	const double PI = 3.14159265358979323846;
-	double angleRad = inclineAngle * PI / 180.0;
-	double drivingForce = shape->getMass() * gravity * std::sin(angleRad);
+	// 3. 施加沿斜面的重力分量（驱动力）- 即使角度为0也调用（此时力为0）
+	applyGravitySin(shape, inclineAngle);
 	
-	// 3. 施加摩擦力（传入即将施加的驱动力）
+	// 4. 施加摩擦力（阻力）
 	double friction = 0.0;
-    double static_friction = 0.0;
 	
 	if (shape->HasCollidedWithGround(ground.getYLevel())) {
-		// 在地面上：使用正确的正压力
+		// 在地面上：使用正确的正压力（包括上方物体的质量）
 		friction = ground.getFriction();
-        static_friction = ground.getStaticFriction();
 		
+		// 获取上方物体施加的压力
 		double fx, fy;
 		shape->getNormalForce(fx, fy);
 		
-		double normalForce = std::abs(fy);
+		// 正压力 = 垂直方向的重力分量 * 质量 + 上方物体施加的压力
+		double normalForce = shape->getMass() * gravity_vertical + std::abs(fy);
 		
-        // 新的摩擦力逻辑：传入即将施加的驱动力
-        shape->applyFriction(normalForce, friction, static_friction, drivingForce);
+		shape->applyFriction(normalForce, friction);
 		
 	} else if (shape->getSupporter() != nullptr) {
-		// 在其他物体上
+		// 在其他物体上：使用正确的正压力（包括上方物体的质量）
 		Shape* supporter = shape->getSupporter();
 		supporter->getFraction(friction);
-        supporter->getStaticFraction(static_friction);
 		
+		// 获取上方物体施加的压力
 		double fx, fy;
 		shape->getNormalForce(fx, fy);
 		
-		double normalForce = std::abs(fy);
+		// 正压力 = 垂直方向的重力分量 * 质量 + 上方物体施加的压力
+		double normalForce = shape->getMass() * gravity_vertical + std::abs(fy);
 		
 		// 获取支撑物速度
 		double supVx, supVy;
 		supporter->getVelocity(supVx, supVy);
 		
-		// 使用相对速度摩擦力：传入即将施加的驱动力
-		applyFrictionOnSupporter(shape, supporter, normalForce, friction, static_friction, drivingForce);
+		// 使用相对速度摩擦力（包含牛顿第三定律反作用力）
+		applyFrictionOnSupporter(shape, supporter, normalForce, friction);
 	}
-	
-	// 4. 最后施加沿斜面的重力分量（驱动力）
-	shape->addToTotalForce(drivingForce, 0.0);
 }
 
 /*=========================================================================================================
- * 处理在空中的物体（自由落体）
+ * 处理在空中的物体（统一处理，包含倾斜角度）
  *=========================================================================================================*/
-void PhysicalWorld::handleAirborneShape(Shape* shape, double deltaTime) {
-	// 在空中：只施加重力
-	shape->applyGravity(gravity);
+void PhysicalWorld::handleAirborneShapeWithGravity(Shape* shape, double deltaTime) {
+	// 空中的物体：施加完整的倾斜重力
+	// 垂直分量（向下）
+	shape->addToTotalForce(0.0, -shape->getMass() * gravity_vertical);
+	
+	// 沿斜面分量（水平方向）
+	applyGravitySin(shape, inclineAngle);
 }
 
 /*=========================================================================================================
  * 在支撑物上施加摩擦力（包括牛顿第三定律反作用力）
  * 使用 Shape 的 applyFrictionRelative() 方法
  *=========================================================================================================*/
-void PhysicalWorld::applyFrictionOnSupporter(Shape* shape, Shape* supporter, double normalForce, double friction, double static_friction, double drivingForce) {
+void PhysicalWorld::applyFrictionOnSupporter(Shape* shape, Shape* supporter, double normalForce, double friction) {
 	// 获取支撑物速度
 	double supVx, supVy;
 	supporter->getVelocity(supVx, supVy);
 	
 	// ✅ 使用 Shape::applyFrictionRelative() 计算相对摩擦力
-	shape->applyFrictionRelative(normalForce, friction, static_friction, supVx, supVy, drivingForce);
+	shape->applyFrictionRelative(normalForce, friction, supVx, supVy);
 	
 	// ✅ 计算反作用力（牛顿第三定律）
+	// 获取刚刚施加到 shape 上的摩擦力
 	double shapeVx, shapeVy;
 	shape->getVelocity(shapeVx, shapeVy);
 	
@@ -513,6 +409,7 @@ void PhysicalWorld::applyFrictionOnSupporter(Shape* shape, Shape* supporter, dou
 		double dirX = -relVx / relSpeed;
 		
 		// 对支撑物施加反作用力
+		// 如果不想让支撑物移动，请把支撑物质量设为 INFINITY
 		supporter->addToTotalForce(-frictionMag * dirX, 0.0);
 	}
 }
@@ -761,7 +658,7 @@ void PhysicalWorld::handleBoundaryCollision(Shape& shape) {
 		if (x + halfWidth < bounds[0] || x - halfWidth > bounds[1] ||
 		    y + halfHeight < bounds[2] || y - halfHeight > bounds[3]) {
 			outOfBounds = true;
-			vx = 0.0;
+		 vx = 0.0;
 			vy = 0.0;
 			
 			if (x + halfWidth < bounds[0]) x = bounds[0] - halfWidth;
@@ -841,7 +738,8 @@ void PhysicalWorld::removeStaticShape(Shape* shape) {
 
 /*=========================================================================================================
  * 形状管理方法实现 - 通过名称查找形状
- *=========================================================================================================*/
+ *=========================================================================================================
+ */
 Shape* PhysicalWorld::findShapeByName(const std::string& name) {
 	// 首先在动态形状中查找
 	Shape* result = findDynamicShapeByName(name);
@@ -872,7 +770,8 @@ Shape* PhysicalWorld::findStaticShapeByName(const std::string& name) {
 
 /*=========================================================================================================
  * 形状管理方法实现 - 通过类型查找所有形状
- *=========================================================================================================*/
+ *=========================================================================================================
+ */
 std::vector<Shape*> PhysicalWorld::findShapesByType(const std::string& type) {
 	std::vector<Shape*> result;
 	
@@ -925,7 +824,8 @@ void PhysicalWorld::clearAllShapes() {
 
 /*=========================================================================================================
  * 形状管理方法实现 - 打印所有形状信息（调试用）
- *=========================================================================================================*/
+ *=========================================================================================================
+ */
 void PhysicalWorld::printAllShapes() const {
 	std::cout << "========== 物理世界中的所有形状 ==========" << std::endl;
 	std::cout << "动态形状数量: " << dynamicShapeList.size() << std::endl;
@@ -982,7 +882,8 @@ void PhysicalWorld::printStaticShapes() const {
  *   "Circle" - 如果是圆形类型
  *   "AABB"   - 如果是矩形/盒子类型
  *   ""       - 如果类型无法识别
- *=========================================================================================================*/
+ *=========================================================================================================
+ */
 std::string PhysicalWorld::parseShapeType(const std::string& type) const {
 	// 转换为小写进行比较
 	std::string lowerType = type;
@@ -1036,7 +937,7 @@ Shape* PhysicalWorld::createShape(const std::string& type, const std::string& na
 	}
 	
 	if (shape != nullptr) {
-		// 设置名称（如果为空则自动生成）
+		// 设置名称（如果为空则自动生成）	
 		if (name.empty()) {
 			shape->setName(generateUniqueName(standardType));
 		} else {
@@ -1272,6 +1173,32 @@ void PhysicalWorld::resolveCollisionWithWall(Shape& dynamicShape, const Wall& wa
 		// 如果圆心在墙壁内部，使用不同的法向量
 		if (distToClosest < 0.0001) {
 			overlap = circle->getRadius();
+			
+			// 找到最近的墙壁边缘
+			double distLeft = circleX - wall.getLeft();
+			double distRight = wall.getRight() - circleX;
+			double distBottom = circleY - wall.getBottom();
+			double distTop = wall.getTop() - circleY;
+			
+			double minDist = std::min({distLeft, distRight, distBottom, distTop});
+			
+			if (minDist == distLeft) {
+				nx = -1.0; ny = 0.0;
+				overlap = circle->getRadius() + distLeft;
+			} else if (minDist == distRight) {
+				nx = 1.0; ny = 0.0;
+				overlap = circle->getRadius() + distRight;
+			} else if (minDist == distBottom) {
+				nx = 0.0; ny = -1.0;
+				overlap = circle->getRadius() + distBottom;
+			} else {
+				nx = 0.0; ny = 1.0;
+				overlap = circle->getRadius() + distTop;
+			}
+		} else {
+			// 更新法向量为圆心指向最近点的反方向
+			nx = dx / distToClosest;
+			ny = dy / distToClosest;
 		}
 	}
 	else if (aabb) {
@@ -1302,59 +1229,87 @@ void PhysicalWorld::resolveCollisionWithWall(Shape& dynamicShape, const Wall& wa
 }
 
 /*=========================================================================================================
- * 施加沿斜面的重力分量（驱动力）
+ * 坐标转换方法：将标准坐标系转换为倾斜显示坐标系
  * 
  * 参数说明：
- *   shape        - 要施加力的形状对象
- *   inclineAngle - 倾斜角度（角度制，-90 到 90）
+ *   x_rel - 标准坐标系的x坐标（物理计算中的实际坐标）
+ *   y_rel - 标准坐标系的y坐标（物理计算中的实际坐标）
+ * 
+ * 返回值：
+ *   std::vector<double> - [0]: 倾斜显示坐标系的x, [1]: 倾斜显示坐标系的y
  * 
  * 功能：
- *   计算并施加重力在斜面方向的分量：F = m * g * sin(θ)
- *   - 当角度为0时（水平），sin(0)=0，不施加力
- *   - 当角度为正时，力沿正x方向
- *   - 当角度为负时，力沿负x方向
+ *   当需要将物理世界倾斜显示时（inclineAngle != 0），将标准物理坐标转换为倾斜显示坐标
+ *   使用旋转矩阵进行坐标变换，仅用于可视化，不影响物理计算
+ *   
+ * 使用示例：
+ *   // 在渲染/绘制代码中：
+ *   double physicsX, physicsY;
+ *   shape->getCentre(physicsX, physicsY);
+ *   
+ *   auto displayCoords = world.inclineToStandard(physicsX, physicsY);
+ *   drawShape(displayCoords[0], displayCoords[1]);  // 使用转换后的坐标进行绘制
  *=========================================================================================================*/
-void PhysicalWorld::applyGravitySin(Shape* shape, double inclineAngle) {
+std::vector<double> PhysicalWorld::inclineToStandard(double x_rel, double y_rel) const {
+	// 如果倾斜角度为0，直接返回原坐标
+	if (std::abs(inclineAngle) < 0.01) {
+		return {x_rel, y_rel};
+	}
+	
 	// 将角度转换为弧度
 	const double PI = 3.14159265358979323846;
 	double angleRad = inclineAngle * PI / 180.0;
 	
-	// 计算沿斜面的重力分量：F = m * g * sin(θ)
-	double forceMagnitude = shape->getMass() * gravity * std::sin(angleRad);
+	// 计算旋转矩阵的cos和sin值
+	double cosTheta = std::cos(angleRad);
+	double sinTheta = std::sin(angleRad);
 	
-	// 施加力（沿x方向，累加到合力）
-	// 正角度：力指向正x方向
-	// 负角度：力指向负x方向
-	shape->addToTotalForce(forceMagnitude, 0.0);
+	// 应用旋转变换
+	// x_display = x_physics * cos(θ) - y_physics * sin(θ)
+	// y_display = x_physics * sin(θ) + y_physics * cos(θ)
+	double x_display = x_rel * cosTheta - y_rel * sinTheta;
+	double y_display = x_rel * sinTheta + y_rel * cosTheta;
+	
+	return {x_display, y_display};
 }
 
 /*=========================================================================================================
- * 坐标转换：倾斜坐标系转标准坐标系
+ * 施加沿斜面的重力分量（g * sin(θ)）
  * 
  * 参数说明：
- *   x_rel - 倾斜坐标系中的x坐标（沿斜面方向）
- *   y_rel - 倾斜坐标系中的y坐标（垂直斜面方向）
- * 
- * 返回值：
- *   vector<double> {x_standard, y_standard} - 标准坐标系中的坐标
+ *   shape - 要施加力的形状对象
+ *   inclineAngle - 倾斜角度（角度制）
  * 
  * 功能：
- *   将倾斜坐标系中的相对坐标转换为标准（水平-垂直）坐标系
- *   使用旋转矩阵进行坐标变换
+ *   计算并施加沿斜面方向的重力分量
+ *   - 正角度：物体受到向右的力
+ *   - 负角度：物体受到向左的力
+ *   - 零角度：无分力（此时sin(0)=0，不施加力）
  *=========================================================================================================*/
-std::vector<double> PhysicalWorld::inclineToStandard(double x_rel, double y_rel) const {
-	// 将角度转换为弧度
+void PhysicalWorld::applyGravitySin(Shape* shape, double inclineAngle) {
 	const double PI = 3.14159265358979323846;
 	double angleRad = inclineAngle * PI / 180.0;
 	
-	// 旋转矩阵变换
-	// x_standard = x_rel * cos(θ) - y_rel * sin(θ)
-	// y_standard = x_rel * sin(θ) + y_rel * cos(θ)
-	double cosAngle = std::cos(angleRad);
-	double sinAngle = std::sin(angleRad);
+	// 计算沿斜面的重力分量: F = m * g * sin(θ)
+	double forceParallel = shape->getMass() * gravity * std::sin(angleRad);
 	
-	double x_standard = x_rel * cosAngle - y_rel * sinAngle;
-	double y_standard = x_rel * sinAngle + y_rel * cosAngle;
-	
-	return {x_standard, y_standard};
+	// 施加水平方向的力（正角度向右，负角度向左）
+	// 注意：当角度为0时，sin(0)=0，因此不会施加任何力（正确的物理行为）
+	shape->addToTotalForce(forceParallel, 0.0);
+}
+
+/*=========================================================================================================
+ * 处理被支撑的物体（旧版本 - 已弃用，保留向后兼容）
+ *=========================================================================================================*/
+void PhysicalWorld::handleSupportedShape(Shape* shape, double deltaTime, const Ground& ground) {
+	// 调用新版本
+	handleSupportedShapeWithGravity(shape, deltaTime, ground);
+}
+
+/*=========================================================================================================
+ * 处理在空中的物体（旧版本 - 已弃用，保留向后兼容）
+ *=========================================================================================================*/
+void PhysicalWorld::handleAirborneShape(Shape* shape, double deltaTime) {
+	// 调用新版本
+	handleAirborneShapeWithGravity(shape, deltaTime);
 }

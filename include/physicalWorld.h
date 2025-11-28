@@ -1,5 +1,5 @@
-#ifndef _physicalWorld_h_
-#define _physicalWorld_h_
+#ifndef _PHYSICALWORLD_H_
+#define _PHYSICALWORLD_H_
 
 #include <vector>
 #include <string>
@@ -9,6 +9,15 @@ struct PhysicalWorld {
 public:
 	// 重力加速度
 	double gravity;
+
+	// 垂直方向的重力分量（用于倾斜时的正压力计算）
+	double gravity_vertical;
+	
+	// 整个坐标系的倾斜角度（角度制，-90 to 90）, 0表示水平
+	double inclineAngle;
+
+	//静摩擦力,最大静摩擦力等于滑动摩擦力
+	double StaticFriction;
 	
 	// 默认时间步长（秒）
 	double timeStep;
@@ -25,11 +34,11 @@ public:
 	Ground ground;  // 物理世界的地面
 	
 	// 构造函数，默认重力为9.8，默认时间步长为1/60秒（60 FPS），默认边界为 [-1000, 1000, -1000, 1000]
-	PhysicalWorld() : gravity(9.8), timeStep(1.0/60.0), bounds{-1000.0, 1000.0, -1000.0, 1000.0}, isPaused(false) {}
+	PhysicalWorld() : gravity(9.8), gravity_vertical(9.8), inclineAngle(0.0), timeStep(1.0/60.0), bounds{-1000.0, 1000.0, -1000.0, 1000.0}, isPaused(false) {}
 	
 	// 带边界的构造函数
 	PhysicalWorld(double left, double right, double bottom, double top) 
-		: gravity(9.8), timeStep(1.0/60.0), bounds{left, right, bottom, top}, isPaused(false) {}
+		: gravity(9.8), gravity_vertical(9.8), inclineAngle(0.0), timeStep(1.0/60.0), bounds{left, right, bottom, top}, isPaused(false) {}
 	
 	// 析构函数
 	~PhysicalWorld() {}
@@ -37,11 +46,31 @@ public:
 	// 设置重力加速度
 	void setGravity(double g) {
 		gravity = g;
+		// 同时更新垂直分量（考虑倾斜角度）
+		const double PI = 3.14159265358979323846;
+		double angleRad = inclineAngle * PI / 180.0;
+		gravity_vertical = gravity * std::cos(angleRad);
 	}
 	
 	// 获取当前重力加速度
 	double getGravity() const {
 		return gravity;
+	}
+	
+	// 设置倾斜角度（角度制，-90 到 90）
+	void setInclineAngle(double angle) {
+		if (angle >= -90.0 && angle <= 90.0) {
+			inclineAngle = angle;
+			// 同时更新垂直分量
+			const double PI = 3.14159265358979323846;
+			double angleRad = inclineAngle * PI / 180.0;
+			gravity_vertical = gravity * std::cos(angleRad);
+		}
+	}
+	
+	// 获取当前倾斜角度
+	double getInclineAngle() const {
+		return inclineAngle;
 	}
 	
 	// 设置时间步长
@@ -144,6 +173,17 @@ public:
 	void placeDynamicShape(Shape& shape, double x_pos, double y_pos);
 	void placeStaticShape(Shape& shape, double x_pos, double y_pos);
 	void placeShapeOnGround(Shape& shape, const Ground& ground);
+	
+	// ========== 板块模型放置方法 ==========
+	// 将一个形状放置在另一个形状的上方
+	// 参数：
+	//   topShape - 要放置在上方的形状
+	//   bottomShape - 底部支撑的形状
+	//   offsetX - 水平偏移量（相对于底部形状中心，默认0表示居中对齐）
+	void placeShapeOnShape(Shape& topShape, Shape& bottomShape, double offsetX = 0.0);
+
+	//==========当倾斜角度不为0时，要将按斜面角度正交相对坐标投射到标准相对坐标==========
+	std::vector<double> inclineToStandard(double x_rel, double y_rel) const;
 
 private:
 	// ========== 暂停状态管理 ==========
@@ -180,10 +220,15 @@ private:
 	// 第三阶段：物理更新
 	void updatePhysics(std::vector<Shape*>& shapeList, double deltaTime, const Ground& ground);
 	
-	// 第三阶段的子步骤
+	// 第三阶段的子步骤（统一的重力处理）
+	void handleSupportedShapeWithGravity(Shape* shape, double deltaTime, const Ground& ground);
+	void handleAirborneShapeWithGravity(Shape* shape, double deltaTime);
+	
+	// 旧的方法保留（向后兼容，但不再使用）
 	void handleSupportedShape(Shape* shape, double deltaTime, const Ground& ground);
 	void handleAirborneShape(Shape* shape, double deltaTime);
-	void applyFrictionOnSupporter(Shape* shape, Shape* supporter, double normalForce, double friction);
+	
+	void applyFrictionOnSupporter(Shape* shape, Shape* supporter, double normalForce, double friction, double static_friction, double drivingForce);
 	
 	// 第四阶段：碰撞检测和处理
 	void handleAllCollisions(std::vector<Shape*>& shapeList);
@@ -212,6 +257,14 @@ private:
 	
 	// 检查名字是否已存在
 	bool isNameExists(const std::string& name) const;
+
+
+	//===========处理倾斜情况========
+	// 统一的倾斜重力处理函数（整合垂直和水平分量）
+	void applyInclineGravity(Shape* shape, double inclineAngle, const Ground& ground);
+	
+	// 旧的辅助函数（已整合到applyInclineGravity中，保留用于向后兼容）
+	void applyGravitySin(Shape* shape, double inclineAngle);
 };
 
 #endif
