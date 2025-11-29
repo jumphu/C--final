@@ -1,6 +1,5 @@
-#include <graphics.h>     
+#include "buttons.h"    
 #include <iostream>
-#include <windows.h>
 
 // 判断鼠标是否在按钮范围内
 bool isInButton(int mx, int my, int x, int y, int w, int h) {
@@ -41,6 +40,7 @@ bool getStopButtonState()  {
 // 绘制所有按钮
 //参数：按钮的x坐标，开始按钮的y坐标，暂停按钮的y坐标，停止按钮的y坐标，按钮宽度，按钮高度
 void drawButtons(int btnX, int startBtnY, int pauseBtnY, int stopBtnY, int btnW, int btnH) {
+    
     // 绘制开始按钮
     if (isStartHovered) //如果鼠标悬停在按钮上方，则isStartHovered就是true，则执行下面的语句
         setfillcolor(RGB(180, 200, 255));  // 按钮填充为浅蓝色
@@ -108,52 +108,31 @@ void handleMouseInput(int btnX, int startBtnY, int pauseBtnY, int stopBtnY, int 
 // 按钮状态检查函数
 void checkButtonStates() {
     if (getStartButtonState()) {
-        // 这里接开始的代码，从这里启动物理引擎
         resetButtonStates();
         //调用resetButtonStates函数，重置开始按钮点击状态为false
+        // 这里接开始的代码，从这里启动物理引擎
     }
 
     if (getPauseButtonState()) {
-        // 这里接暂停的代码，从这里暂停物理引擎
-        resetButtonStates();
+         resetButtonStates();
         //调用resetButtonStates函数，重置暂停按钮点击状态为false
+        // 这里接暂停的代码，从这里暂停物理引擎
     }
 
     if (getStopButtonState()) {
-        // 这里接停止的代码，从这里停止物理引擎
         resetButtonStates();
         ////调用resetButtonStates函数，重置停止按钮点击状态为false
+        // 这里接停止的代码，从这里停止物理引擎
     }
 }
 
-
-//核心函数Bottom
-int Bottom() {
-    initgraph(600, 400);
-
-    // 按钮参数
-    int btnW = 200;
-    int btnH = 60;
-    int margin = 20;
+void initButtons(int& btnX, int& startBtnY, int& pauseBtnY, int& stopBtnY, int& btnW, int& btnH, int margin) {
+    btnW = 200;
+    btnH = 60;
     
-    // 三个按钮的Y坐标
-    int startBtnY = 400 - btnH * 3 - margin * 2;
-    int pauseBtnY = 400 - btnH * 2 - margin;
-    int stopBtnY = 400 - btnH - margin;
-    int btnX = 600 - btnW - margin;
-
-    // 主循环
-    while (true) {
-        cleardevice(); //清除上一帧，准备绘制新帧，防止画面重叠堆积
-        
-        // 处理鼠标输入
-        handleMouseInput(btnX, startBtnY, pauseBtnY, stopBtnY, btnW, btnH);
-        
-        // 绘制所有按钮，每帧都绘制
-        drawButtons(btnX, startBtnY, pauseBtnY, stopBtnY, btnW, btnH);
-        
-        // 检查按钮状态并执行相应逻辑
-        checkButtonStates();
-        
-    }
+    // 三个按钮的Y坐标（假设窗口高度为400，可根据实际传入参数调整）
+    startBtnY = 400 - btnH * 3 - margin * 2;
+    pauseBtnY = 400 - btnH * 2 - margin;
+    stopBtnY = 400 - btnH - margin;
+    btnX = 600 - btnW - margin;  // 假设窗口宽度为600，可调整
 }
