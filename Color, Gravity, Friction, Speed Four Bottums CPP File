@@ -75,13 +75,8 @@ void AdditionalButtons::drawButtons() {
 
 //处理来自鼠标的数据输入
 void AdditionalButtons::handleMouseInput() {
-    ExMessage msg;  //定义一个ExMessage结构体变量用于存储鼠标消息
-
-    //限制每次处理的数据数量，防止数据堆积过多，导致卡顿
-    const int MAX_MESSAGES = 10;  //限制每次处理的最大消息数量为10
-    int processedMessages = 0;  //已处理的消息计数器
-
-    //循环处理鼠标消息，直到没有数据或达到最大处理数量
+    ExMessage msg;  //定义一个ExMessage结构体变量用于存储鼠标数据
+    //循环处理鼠标消息，直到没有数据
     while (peekmessage(&msg, EM_MOUSE) && processedMessages < MAX_MESSAGES) {
         //如果数据是移动鼠标，则执行下面的语句
         if (msg.message == WM_MOUSEMOVE) {
@@ -100,8 +95,6 @@ void AdditionalButtons::handleMouseInput() {
             if (isFrictionHovered) isFrictionClicked = true;
             if (isSpeedHovered) isSpeedClicked = true;
         }
-
-        ++processedMessages;  //增加已处理消息计数器
     }
 }
 
