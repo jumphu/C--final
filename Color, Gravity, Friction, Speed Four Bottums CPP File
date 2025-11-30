@@ -218,22 +218,22 @@ void AdditionalButtons::showInputBox(const char* prompt, float& value) {
     }
 }
 
-//获取当前对于颜色的选择
+//获取选择的颜色
 const char* AdditionalButtons::getColorChoice() const {
-    return colorChoice;  //返回选择的颜色对应的字符串
+    return colorChoice;  //返回选择的颜色
 }
 
-//获取重力系数值
+//获取输入的重力系数值
 float AdditionalButtons::getGravityCoefficient() const {
-    return gravityCoefficient;  //返回重力系数值
+    return gravityCoefficient;  //返回输入的重力系数值
 }
 
-//获取摩擦力系数
+//获取输入的摩擦力系数
 float AdditionalButtons::getFrictionCoefficient() const {
-    return frictionCoefficient;  //返回摩擦力系数
+    return frictionCoefficient;  //返回输入的摩擦力系数
 }
 
-//获取速度值
+//获取输入的速度值
 float AdditionalButtons::getSpeed() const {
-    return speed;  //返回速度值
+    return speed;  //返回输入的速度值
 }
