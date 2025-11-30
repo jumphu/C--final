@@ -1,0 +1,239 @@
+#include "additional_buttons.h"
+#include <iostream>
+#include <cstring>
+#include <cstdlib>
+
+
+//这是一个构造函数，用来创建对象
+//初始化所有成员变量
+AdditionalButtons::AdditionalButtons() 
+    : isColorClicked(false), isGravityClicked(false), isFrictionClicked(false), isSpeedClicked(false),
+      isColorHovered(false), isGravityHovered(false), isFrictionHovered(false), isSpeedHovered(false),
+      gravityCoefficient(9.8f), frictionCoefficient(0.1f), speed(0.0f) {
+    strcpy(colorChoice, "Red");
+}
+
+//初始化按钮的位置和尺寸
+void AdditionalButtons::initButtons(int windowWidth, int windowHeight, int margin) {
+    btnW = 200;  //设置按钮宽度为200像素
+    btnH = 60;   //设置按钮高度为60像素
+    
+    colorBtnY = windowHeight - btnH * 7 - margin * 6;   
+    //颜色按钮的Y坐标
+    gravityBtnY = windowHeight - btnH * 6 - margin * 5;
+    //重力系数按钮的Y坐标
+    frictionBtnY = windowHeight - btnH * 5 - margin * 4;
+    //摩擦力系数按钮的Y坐标
+    speedBtnY = windowHeight - btnH * 4 - margin * 3;
+    //速度按钮的Y坐标
+    btnX = windowWidth - btnW - margin;
+    //所有的按钮的X坐标
+}
+
+//检查鼠标是否在按钮范围内
+bool AdditionalButtons::isInButton(int mx, int my, int x, int y, int w, int h) const {
+    return (mx >= x && mx <= x + w && my >= y && my <= y + h);
+}
+
+//重置所有按钮的点击状态
+void AdditionalButtons::resetButtonStates() {
+    isColorClicked = false;
+    //将颜色按钮的点击状态重置为false，即未点击
+    isGravityClicked = false;
+    //将重力系数按钮的点击状态重置为false，即未点击
+    isFrictionClicked = false;
+    //将摩擦力系数的按钮点击状态重置为false，即未点击
+    isSpeedClicked = false;
+    //将速度按钮的点击状态重置为false，即未点击
+}
+
+//绘制按钮
+void AdditionalButtons::drawButtons() {
+    const char* buttonLabels[] = {"Choose Color", "Gravity Coefficient", "Friction Coefficient", "Speed"};
+    //按钮上的文字标签
+    int buttonYs[] = {colorBtnY, gravityBtnY, frictionBtnY, speedBtnY};
+    //按钮的Y坐标数组
+    bool* hoverStates[] = {&isColorHovered, &isGravityHovered, &isFrictionHovered, &isSpeedHovered};
+    //按钮的悬停状态数组
+
+    //使用if循环语句绘制每个按钮
+    for (int i = 0; i < 4; ++i) {
+        setfillcolor(*hoverStates[i] ? HOVER_COLOR : BUTTON_COLOR); 
+        //根据悬停状态设置按钮颜色
+        solidrectangle(btnX, buttonYs[i], btnX + btnW, buttonYs[i] + btnH);  //绘制按钮矩形
+
+        //计算文字位置，使其居中显示在按钮上
+        int textX = btnX + (btnW - textwidth(buttonLabels[i])) / 2;
+        int textY = buttonYs[i] + (btnH - textheight(buttonLabels[i])) / 2;
+
+        settextcolor(TEXT_COLOR);  //设置文字颜色为红色
+        setbkmode(TRANSPARENT);  //设置文字背景模式为透明
+        settextstyle(18, 0, "Consolas");  //设置文字样式为Consolas，大小为18
+        outtextxy(textX, textY, buttonLabels[i]);  //在按钮上绘制文字
+    }
+}
+
+//处理来自鼠标的数据输入
+void AdditionalButtons::handleMouseInput() {
+    ExMessage msg;  //定义一个ExMessage结构体变量用于存储鼠标数据
+    //循环处理鼠标消息，直到没有数据
+    while (peekmessage(&msg, EM_MOUSE) && processedMessages < MAX_MESSAGES) {
+        //如果数据是移动鼠标，则执行下面的语句
+        if (msg.message == WM_MOUSEMOVE) {
+            //更新每个按钮的悬停状态，当鼠标在按钮范围内时，状态为true，否则为false
+            isColorHovered = isInButton(msg.x, msg.y, btnX, colorBtnY, btnW, btnH);
+            isGravityHovered = isInButton(msg.x, msg.y, btnX, gravityBtnY, btnW, btnH);
+            isFrictionHovered = isInButton(msg.x, msg.y, btnX, frictionBtnY, btnW, btnH);
+            isSpeedHovered = isInButton(msg.x, msg.y, btnX, speedBtnY, btnW, btnH);
+        }
+        
+        //如果数据是鼠标左键按下，则执行下面的语句
+        if (msg.message == WM_LBUTTONDOWN) {
+            //根据悬停状态更新每个按钮的点击状态，如果悬停则if条件为true，则执行命令，设置为true，即按钮被点击
+            if (isColorHovered) isColorClicked = true;
+            if (isGravityHovered) isGravityClicked = true;
+            if (isFrictionHovered) isFrictionClicked = true;
+            if (isSpeedHovered) isSpeedClicked = true;
+        }
+    }
+}
+
+//检查按钮状态并执行相应操作
+void AdditionalButtons::checkButtonStates() {
+    if (isColorClicked) {  //如果颜色按钮被点击，则执行下面的语句
+        resetButtonStates();  //重置所有按钮的点击状态
+        showColorOptions();  //显示颜色选项
+    }
+
+    if (isGravityClicked) {  //如果重力系数按钮被点击，则执行下面的语句
+        resetButtonStates();  //重置所有按钮的点击状态
+        showInputBox("Please input gravity coefficient", gravityCoefficient);
+        //显示输入框，提示用户输入重力系数，并将输入值存储在gravityCoefficient变量中
+    }
+
+    if (isFrictionClicked) {  //如果摩擦力系数按钮被点击，则执行下面的语句
+        resetButtonStates();  //重置所有按钮的点击状态
+        showInputBox("Please input friction coefficient", frictionCoefficient);
+        //显示输入框，提示用户输入摩擦力系数，并将输入值存储在frictionCoefficient变量中
+    }
+
+    if (isSpeedClicked) {  //如果速度按钮被点击，则执行下面的语句
+        resetButtonStates();  //重置所有按钮的点击状态
+        showInputBox("Please input speed", speed);  
+        //显示输入框，提示用户输入速度值，并将输入值存储在speed变量中
+    }
+}
+
+//显示颜色选项
+void AdditionalButtons::showColorOptions() {
+    const char* colorOptions[] = {"Red", "Blue", "Orange", "Yellow"};  //颜色选项
+    int optionY = 100;  //选项的起始Y坐标
+    int optionHeight = 30;  //每个选项的高度
+    int optionWidth = 150;  //选项的宽度
+    int optionX = (getwidth() - optionWidth) / 2;  //选项的X坐标，居中显示
+
+    //循环显示颜色选项，直到用户选择一个颜色或者关闭选项
+    while (true) {
+        //绘制4个颜色选项
+        for (int i = 0; i < 4; ++i) {
+            setfillcolor(BUTTON_COLOR);  //设置选项按钮的颜色
+            //绘制选项按钮
+            solidrectangle(optionX, optionY + i * optionHeight, optionX + optionWidth, optionY + (i + 1) * optionHeight);
+            settextcolor(TEXT_COLOR);  //设置文字颜色
+            setbkmode(TRANSPARENT);  //设置文字背景模式为透明
+            settextstyle(18, 0, "Consolas");  //设置文字样式为Consolas，大小为18
+            //在选项按钮上绘制颜色名称
+            outtextxy(optionX + 10, optionY + i * optionHeight + 5, colorOptions[i]);
+        }
+
+        ExMessage msg;  //定义一个ExMessage结构体变量用于存储鼠标数据
+        if (peekmessage(&msg, EM_MOUSE)) {  //如果有鼠标数据，则执行下面的语句
+            if (msg.message == WM_LBUTTONDOWN) {
+            //如果用户是否点击了某个颜色选项，则执行下面的语句
+                for (int i = 0; i < 4; ++i) {
+                //利用for循环检查每个颜色选项，如果鼠标点击位置在某个选项范围内，则执行下面的语句
+                    if (isInButton(msg.x, msg.y, optionX, optionY + i * optionHeight, optionWidth, optionHeight)) {
+                    //如果鼠标点击位置在选项范围内，则执行下面的语句
+                        strcpy(colorChoice, colorOptions[i]);  
+                        //将选择的颜色名称存储在colorChoice变量中
+                        return;  
+                        //用户选择了一个颜色，退出函数
+                    }
+                }
+            }
+        }
+    }
+}
+
+//显示输入框，提示用户输入数值
+void AdditionalButtons::showInputBox(const char* prompt, float& value) {
+    int inputBoxX = (getwidth() - 200) / 2;  //输入框的X坐标，居中显示
+    int inputBoxY = (getheight() - 50) / 2;  //输入框的Y坐标，居中显示
+
+    char input[20] = "";  //输入缓冲区，用于存储用户输入的字符串
+    int inputIndex = 0;   //输入字符串的索引，用于跟踪输入位置
+
+    //循环显示输入框，直到用户按下回车键确认输入
+    while (true) {
+        setfillcolor(BUTTON_COLOR);  //设置输入框的背景颜色为按钮颜色，即浅灰色
+        //绘制输入框
+        solidrectangle(inputBoxX, inputBoxY, inputBoxX + 200, inputBoxY + 50);
+        //绘制输入提示文字和用户输入的内容
+        settextcolor(TEXT_COLOR);  //设置文字颜色为红色
+        setbkmode(TRANSPARENT);  //设置文字背景模式为透明
+        settextstyle(18, 0, "Consolas");  //设置文字样式为Consolas，大小为18
+        outtextxy(inputBoxX + 10, inputBoxY + 5, prompt);  //显示提示文字
+        outtextxy(inputBoxX + 10, inputBoxY + 25, input);  //显示用户输入的内容
+
+        ExMessage msg;  //定义一个ExMessage结构体变量用于存储消息
+        if (peekmessage(&msg, EM_MOUSE | EM_KEY)) {
+        //如果有鼠标或键盘数据，则执行下面的语句
+            if (msg.message == WM_KEYDOWN) {  //如果是键盘按下事件，则执行下面的语句
+                if (msg.vkcode == VK_RETURN) {  
+                //如果用户按下回车键，则执行下面的语句
+                    value = atof(input);  //将输入的字符串转换为浮点数，并存储在value变量中
+                    return;  //退出函数
+                } 
+                else if (msg.vkcode == VK_BACK && inputIndex > 0) {  
+                    //如果用户按下退格键，并且输入索引大于0，则执行下面的语句
+                    input[--inputIndex] = '\0';  //退格删除操作  
+                    //删除输入字符串的最后一个字符
+                } 
+                else if (msg.vkcode >= '0' && msg.vkcode <= '9' && inputIndex < 19) {  
+                    //如果用户按下的是数字键，并且输入索引小于19，则执行下面的语句
+                    input[inputIndex++] = msg.vkcode;
+                    //将数字字符添加到输入字符串中
+                    input[inputIndex] = '\0';
+                    //在输入字符串末尾添加字符串结束符
+                } 
+                else if (msg.vkcode == '.' && inputIndex < 19 && strchr(input, '.') == NULL) {
+                    //如果用户按下小数点键，并且输入索引小于19，且输入字符串中还没有小数点，则执行下面的语句
+                    input[inputIndex++] = '.';
+                    //将小数点字符添加到输入字符串中
+                    input[inputIndex] = '\0';
+                    //在输入字符串末尾添加字符串结束符
+                }
+            }
+        }
+    }
+}
+
+//获取选择的颜色
+const char* AdditionalButtons::getColorChoice() const {
+    return colorChoice;  //返回选择的颜色
+}
+
+//获取输入的重力系数值
+float AdditionalButtons::getGravityCoefficient() const {
+    return gravityCoefficient;  //返回输入的重力系数值
+}
+
+//获取输入的摩擦力系数
+float AdditionalButtons::getFrictionCoefficient() const {
+    return frictionCoefficient;  //返回输入的摩擦力系数
+}
+
+//获取输入的速度值
+float AdditionalButtons::getSpeed() const {
+    return speed;  //返回输入的速度值
+}
