@@ -126,13 +126,15 @@ void checkButtonStates() {
     }
 }
 
+//初始化函数
+//参数：按钮的x坐标，开始按钮的y坐标，暂停按钮的y坐标，停止按钮的y坐标，按钮宽度，按钮高度，边距
 void initButtons(int& btnX, int& startBtnY, int& pauseBtnY, int& stopBtnY, int& btnW, int& btnH, int margin) {
     btnW = 200;
     btnH = 60;
     
-    // 三个按钮的Y坐标（假设窗口高度为400，可根据实际传入参数调整）
-    startBtnY = 400 - btnH * 3 - margin * 2;
-    pauseBtnY = 400 - btnH * 2 - margin;
-    stopBtnY = 400 - btnH - margin;
-    btnX = 600 - btnW - margin;  // 假设窗口宽度为600，可调整
+    // 三个按钮的Y坐标
+    startBtnY = 600 - btnH * 3 - margin * 2;
+    pauseBtnY = 600 - btnH * 2 - margin;
+    stopBtnY = 600 - btnH - margin;
+    btnX = 800 - btnW - margin;  
 }
