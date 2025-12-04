@@ -1,4 +1,4 @@
-#include "buttons.h"    
+#include "allbottums.h"    
 #include <iostream>
 
 // 判断鼠标是否在按钮范围内
