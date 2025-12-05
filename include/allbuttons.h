@@ -89,5 +89,24 @@ void checkButtonStates();
 // 初始化按钮
 void initButtons(int& btnX, int& model1BtnY, int& model2BtnY, int& model3BtnY, int& btnW, int& btnH, int margin);
 
+//新加内容：
+extern bool sphere_creationClicked;
+extern bool two_starsClicked;
+extern bool solar_sysClicked;
+
+extern bool sphere_creationHovered;
+extern bool two_starsHovered;
+extern bool solar_sysHovered;
+
+bool getSphereCreationButtonState();
+bool getTwoStarsButtonState();
+bool getSolarSysButtonState();
+
+void drawSceneModelButtons(int btnX, int sphere_creationBtnY, int two_starsBtnY, int solar_sysBtnY, int btnW, int btnH);
+void handleSceneModelMouseInput(int btnX, int sphere_creationBtnY, int two_starsBtnY, int solar_sysBtnY, int btnW, int btnH);
+void checkSceneModelButtonStates();
+void initSceneModelButtons(int& btnX, int& sphere_creationBtnY, int& two_starsBtnY, int& solar_sysBtnY, int& btnW, int& btnH, int margin = 20);
 
 #endif
+
+

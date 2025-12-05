@@ -1,125 +1,123 @@
-#include <graphics.h>
-#include <conio.h>
-#include <iostream>
 #include "PhysicsRenderBridge.h"
-
-// 简单的按钮实现[citation:2]
-class EasyXButton {
-private:
-    int x, y, width, height;
-    std::string label;
-    bool isHovered;
-    bool isClicked;
-    
-public:
-    EasyXButton(int x, int y, int w, int h, std::string text) 
-        : x(x), y(y), width(w), height(h), label(text), isHovered(false), isClicked(false) {}
-    
-    void update(const MOUSEMSG& mouse) {
-        // 检测悬停
-        isHovered = (mouse.x >= x && mouse.x <= x + width && 
-                    mouse.y >= y && mouse.y <= y + height);
-        
-        // 检测点击
-        if (isHovered && mouse.mkLButton) {
-            isClicked = true;
-        } else {
-            isClicked = false;
-        }
-        
-        // 绘制按钮[citation:2]
-        if (isClicked) {
-            setfillcolor(RGB(100, 100, 100));
-        } else if (isHovered) {
-            setfillcolor(RGB(200, 200, 200));
-        } else {
-            setfillcolor(RGB(150, 150, 150));
-        }
-        
-        fillrectangle(x, y, x + width, y + height);
-        settextcolor(BLACK);
-        setbkmode(TRANSPARENT);
-        outtextxy(x + 10, y + (height - textheight(label.c_str())) / 2, label.c_str());
-    }
-    
-    bool isButtonClicked() const { return isClicked; }
-    bool isButtonHovered() const { return isHovered; }
-};
+#include "Renderer.h"
+#include "ALL_BUTTONS_H"
+#include "MusicPlayer.h"
+#include "DigitalRainBackground.h"
 
 int main() {
-    // 初始化图形窗口[citation:2]
+    // 1. 初始化EasyX
     initgraph(800, 600, EX_SHOWCONSOLE);
     setbkcolor(WHITE);
     cleardevice();
     
-    // 创建物理世界和接口桥梁
-    PhysicalWorld physics_world;
-    PhysicsRenderBridge bridge(physics_world);
+    // 2. 创建各模块
+    // 2.1 创建渲染器
+    Renderer renderer(800, 600, 100.0);  // 100 pixels per meter
+    
+    // 2.2 创建物理世界适配器
+    auto physics_adapter = std::make_unique<DefaultPhysicalWorldAdapter>();
+    
+    // 2.3 创建桥梁
+    PhysicsRenderBridge bridge(std::move(physics_adapter), &renderer);
     bridge.initialize(100.0, {400, 300});
     
-    // 创建UI元素
-    EasyXButton startButton(50, 50, 100, 40, "Start");
-    EasyXButton pauseButton(50, 100, 100, 40, "Pause"); 
-    EasyXButton stopButton(50, 150, 100, 40, "Stop");
+    // 2.4 创建其他组件
+    MusicPlayer music_player;
+    DigitalRainBackground background;
     
-    // 主循环
-    while (true) {
-        // 处理消息
-        if (MouseHit()) {
-            MOUSEMSG mouse = GetMouseMsg();
-            
-            // 更新按钮状态
-            startButton.update(mouse);
-            pauseButton.update(mouse);
-            stopButton.update(mouse);
-            
-            // 处理用户输入
-            std::vector<UserInput> user_inputs;
-            
-            // 处理按钮点击
-            if (startButton.isButtonClicked()) {
-                UserInput start_event;
-                start_event.type = UserInput::BUTTON_CLICK;
-                start_event.parameter_name = "start";
-                user_inputs.push_back(start_event);
-            }
-            
-            // 处理鼠标拖动等其它事件...
+    // 3. 初始化按钮
+    initButtons(50, 50, 100, 40, 20);  // 从ALL_BUTTONS_H
+    initBtns(800, 600);  // 附加按钮组1
+    initBtns2(800, 600); // 附加按钮组2
+    
+    // 4. 主循环
+    bool running = true;
+    while (running && !_kbhit()) {
+        // 4.1 处理输入
+        std::vector<UserInput> inputs;
+        handleMouseInput();  // 更新按钮状态
+        updBtns();           // 更新附加按钮1
+        updBtns2();          // 更新附加按钮2
+        
+        // 4.2 更新桥梁状态
+        bridge.updateButtonStates();
+        
+        // 4.3 更新物理
+        bridge.syncInputToPhysics(inputs);
+        
+        // 4.4 物理更新（简化）
+        auto adapter = dynamic_cast<DefaultPhysicalWorldAdapter*>(
+            bridge.getPhysicsAdapter());
+        if (adapter) {
+            adapter->update(0.016);  // 假设60FPS
         }
         
-        // 更新按钮状态
-        ButtonStates button_states;
-        button_states.start_clicked = startButton.isButtonClicked();
-        button_states.pause_clicked = pauseButton.isButtonClicked();
-        button_states.stop_clicked = stopButton.isButtonClicked();
-        button_states.start_hovered = startButton.isButtonHovered();
-        button_states.pause_hovered = pauseButton.isButtonHovered();
-        button_states.stop_hovered = stopButton.isButtonHovered();
-        
-        bridge.updateButtonStates(button_states);
-        bridge.handleButtonEvents();
-        
-        // 更新物理世界
-        if (!bridge.isPaused()) {
-            physics_world.update(physics_world.dynamicShapeList, physics_world.ground);
-        }
-        
-        // 同步和渲染
+        // 4.5 同步到渲染
         bridge.syncPhysicsToRender();
         
-        // 清除并重绘
-        cleardevice();
+        // 4.6 渲染
+        renderer.BeginFrame();
+        renderer.Clear(WHITE);
         
-        // 渲染物理形状
-        bridge.renderShapes();
+        // 渲染背景
+        background.UpdateAndDraw();
         
-        // 渲染UI
-        startButton.update(GetMouseMsg());
-        pauseButton.update(GetMouseMsg());
-        stopButton.update(GetMouseMsg());
+        // 渲染物理对象
+        const auto& render_objects = bridge.getRenderObjects();
+        for (const auto& pair : render_objects) {
+            const auto& obj = pair.second;
+            
+            switch (obj.type) {
+                case RenderObject::BALL: {
+                    BallData ball;
+                    ball.x = obj.ball.x;
+                    ball.y = obj.ball.y;
+                    ball.radius = obj.ball.radius;
+                    ball.vx = obj.ball.vx;
+                    ball.vy = obj.ball.vy;
+                    ball.mass = obj.ball.mass;
+                    ball.color = obj.color;
+                    renderer.DrawBall(ball);
+                    break;
+                }
+                case RenderObject::BLOCK: {
+                    BlockData block;
+                    block.cx = obj.block.cx;
+                    block.cy = obj.block.cy;
+                    block.width = obj.block.width;
+                    block.height = obj.block.height;
+                    block.angle = obj.block.angle;
+                    block.vx = obj.block.vx;
+                    block.vy = obj.block.vy;
+                    block.mass = obj.block.mass;
+                    block.color = obj.color;
+                    renderer.DrawBlock(block);
+                    break;
+                }
+                case RenderObject::RAMP: {
+                    RampData ramp;
+                    ramp.x1 = obj.ramp.x1;
+                    ramp.y1 = obj.ramp.y1;
+                    ramp.x2 = obj.ramp.x2;
+                    ramp.y2 = obj.ramp.y2;
+                    ramp.mu = obj.ramp.mu;
+                    renderer.DrawRamp(ramp);
+                    break;
+                }
+            }
+        }
         
-        // 控制帧率
-        Sleep(10);
+        // 渲染按钮
+        drawButtons();  // 主控制按钮
+        drawBtns();     // 附加按钮组1
+        drawBtns2();    // 附加按钮组2
+        
+        // 渲染音乐播放器
+        music_player.Draw();
+        
+        renderer.EndFrame();
+        
+        Sleep(16);
     }
     
     closegraph();

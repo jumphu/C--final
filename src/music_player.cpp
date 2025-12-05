@@ -1,4 +1,4 @@
-#include <music_player.h>
+#include "music_player.h"
 #include <graphics.h>
 #include <windows.h>
 #include <mmsystem.h>
@@ -91,7 +91,7 @@ void MusicPlayer::Draw() {
         setlinestyle(PS_SOLID, 4);  // 设置边框为实线，宽度为4
     } else {
         setlinecolor(RGB(0, 0, 0)); // 设置边框颜色为黑色
-        setlinestyle(PS_SOLID, 3);  // 设置边框为实线，宽度为3
+        setlinestyle(PS_SOLID, 3);  // 设置边框为实线，线条宽度为3
     }
     
     fillcircle(posX, posY, radius);  // 绘制填充圆形按钮背景
