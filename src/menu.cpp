@@ -1,330 +1,271 @@
-// menu_integrated.cpp
-// �滻ԭ menu.cpp���������ϱ�������ť�����֡���Ⱦ
-#include "Renderer.h"
-#include "background_integrated.h"
-#include "allbottums.h"
-#include "music.h"
+#include "menu.h"
 
-#include <conio.h>
-#include <string>
-#include <sstream>
-#include <vector>
-#include <iomanip>
-#include <cmath>
+// ========================================================
+//              全局对象（菜单运行所需）
+// ========================================================
 
-enum class AppState { MENU, DEMO_RUNNING, DEMO_PAUSED };
-enum class ModelType { SLOPE = 0, COLLISION = 1 };
+Renderer renderer(1280, 720);
+DigitalRainBackgroundIntegrated background;
+MusicPlayer musicPlayer(1180, 80, 50);   // 右上角音乐按钮
 
-struct SlopeParams {
-    double top_x, top_y, bottom_x, bottom_y, mu;
-    BallData ball;
-};
+// 当前程序状态
+AppState appState = AppState::MENU;
 
-struct CollisionParams {
-    BallData b1, b2;
-};
+// 当前物理模型（场景1、场景2、场景3）
+ModelType currentModel = ModelType::SLOPE;
 
-int main() {
-    const int WINW = 1024;
-    const int WINH = 720;
-    const double SCALE = 60.0;
+// Model3：三个子模型（0=sphere creation, 1=two stars, 2=solar sys）
+int model3SubScene = -1;   // 未选择任何子模型
 
-    Renderer renderer(WINW, WINH, SCALE);
 
-    // Integrated components
-    DigitalRainBackgroundIntegrated bg;
-    MusicPlayer musicBtn(920, 80, 36);
+// ========================================================
+//                     工具函数
+// ========================================================
 
-    AppState state = AppState::MENU;
-    ModelType model = ModelType::SLOPE;
+// 重置所有“选择模型”的按钮状态
+void resetModelSelection()
+{
+    resetButtonStates();
+}
 
-    // Default slope params
-    SlopeParams slope;
-    slope.top_x = 2.0; slope.top_y = 4.0;
-    slope.bottom_x = 8.0; slope.bottom_y = 1.5;
-    slope.mu = 0.15;
-    slope.ball.radius = 0.18;
-    slope.ball.mass = 0.5;
-    slope.ball.color = RED;
-    slope.ball.vx = slope.ball.vy = 0.0;
-    slope.ball.x = slope.top_x;
-    slope.ball.y = slope.top_y + slope.ball.radius + 0.001;
 
-    // Default collision params
-    CollisionParams coll;
-    coll.b1.x = 2.5; coll.b1.y = 2.0; coll.b1.radius = 0.3; coll.b1.mass = 1.0; coll.b1.vx = 2.0; coll.b1.vy = 0; coll.b1.color = BLUE;
-    coll.b2.x = 6.0; coll.b2.y = 2.0; coll.b2.radius = 0.4; coll.b2.mass = 1.5; coll.b2.vx = -1.0; coll.b2.vy = 0; coll.b2.color = GREEN;
+// ========================================================
+//                    场景绘制和模拟
+// ========================================================
 
-    SlopeParams slope_init = slope;
-    CollisionParams coll_init = coll;
 
-    // init button modules positions
-    initBtns(WINW, WINH);
-    initBtns2(WINW, WINH);
+// ----------- 场景1：斜面 -----------
+void drawSlopePreview(const SlopeParams& p)
+{
+    renderer.DrawRamp(p.top_x, p.top_y, p.bottom_x, p.bottom_y);
+    renderer.DrawBall(p.ball);
+}
 
-    double simTime = 0.0;
-    const double g = 9.81;
-    const double dt = 0.016;
-    bool quit = false;
-    bool paused = false;
+void simulateSlope(SlopeParams& p)
+{
+    // 重力加速度
+    const double g = 9.8;
 
-    int menuIndex = 0;
-    int maxMenu = 3;
+    // 方向
+    double dx = p.bottom_x - p.top_x;
+    double dy = p.bottom_y - p.top_y;
 
-    // main loop
-    while (!quit) {
+    double L = sqrt(dx*dx + dy*dy);
+    if (L < 1) return;
+
+    double ux = dx / L;
+    double uy = dy / L;
+
+    // 重力沿斜面分量
+    double a = g * (ux * 0 + uy * 1) - p.mu * g;
+
+    // 更新速度
+    p.ball.vx += a * ux * 0.016;
+    p.ball.vy += a * uy * 0.016;
+
+    // 更新位置
+    p.ball.x += p.ball.vx * 0.016;
+    p.ball.y += p.ball.vy * 0.016;
+
+    // 到达底部停止
+    if (p.ball.x > p.bottom_x - 1 && p.ball.y > p.bottom_y - 1)
+    {
+        p.ball.vx = p.ball.vy = 0;
+    }
+}
+
+
+// ----------- 场景2：双球碰撞 -----------
+void drawCollisionPreview(const CollisionParams& p)
+{
+    renderer.DrawBall(p.b1);
+    renderer.DrawBall(p.b2);
+}
+
+void simulateCollision(CollisionParams& p)
+{
+    // 更新位置
+    p.b1.x += p.b1.vx * 0.016;
+    p.b2.x += p.b2.vx * 0.016;
+
+    // 检查碰撞
+    double dx = p.b1.x - p.b2.x;
+    double dy = p.b1.y - p.b2.y;
+    double dist = sqrt(dx*dx + dy*dy);
+
+    if (dist < p.b1.r + p.b2.r)
+    {
+        // 一维弹性碰撞
+        double v1 = p.b1.vx;
+        double v2 = p.b2.vx;
+
+        p.b1.vx = (v1*(p.b1.m - p.b2.m) + 2*p.b2.m*v2) / (p.b1.m + p.b2.m);
+        p.b2.vx = (v2*(p.b2.m - p.b1.m) + 2*p.b1.m*v1) / (p.b1.m + p.b2.m);
+    }
+}
+
+
+// ========================================================
+//                     Model3 三子场景
+// ========================================================
+
+// ★ 你可以根据需要实现自己的动画
+void drawScene3_sphereCreation()
+{
+    outtextxy(850, 300, "Sphere Creation Preview");
+}
+
+void drawScene3_twoStars()
+{
+    outtextxy(850, 300, "Binary Stars Preview");
+}
+
+void drawScene3_solarSystem()
+{
+    outtextxy(850, 300, "Solar System Preview");
+}
+
+
+// ========================================================
+//                     UI 绘制：菜单状态
+// ========================================================
+
+void drawMenuUI()
+{
+    // 背景
+    background.UpdateAndDraw();
+
+    // 标题
+    settextstyle(30, 0, "Consolas");
+    outtextxy(50, 30, "Physics Visual Demo Menu");
+
+    // 1. 物理场景三按钮 (model1 / model2 / model3)
+    int btnX, m1Y, m2Y, m3Y, btnW, btnH;
+    initButtons(btnX, m1Y, m2Y, m3Y, btnW, btnH, 80);
+    drawButtons(btnX, m1Y, m2Y, m3Y, btnW, btnH);
+
+    // 2. 根据模型类型显示详细设置 ----
+    if (currentModel == ModelType::SLOPE)
+    {
+        outtextxy(350, 110, "Model: Slope");
+        drawBtns();       // 4 按钮界面
+    }
+    else if (currentModel == ModelType::COLLISION)
+    {
+        outtextxy(350, 110, "Model: Collision");
+        drawBtns2();      // 8 按钮界面
+    }
+    else if (currentModel == ModelType::MODEL3)
+    {
+        outtextxy(350, 110, "Model: Scene Model Set");
+
+        // 子场景按钮（sphere / two-stars / solar system）
+        int sbX, s1Y, s2Y, s3Y, sbW, sbH;
+        initSceneModelButtons(sbX, s1Y, s2Y, s3Y, sbW, sbH);
+        drawSceneModelButtons(sbX, s1Y, s2Y, s3Y, sbW, sbH);
+
+        // 预览
+        if (model3SubScene == 0) drawScene3_sphereCreation();
+        if (model3SubScene == 1) drawScene3_twoStars();
+        if (model3SubScene == 2) drawScene3_solarSystem();
+    }
+
+    // 3. Start/Pause/Stop 三按钮
+    int bX, sY, pY, stY, BW, BH;
+    initButtons(bX, sY, pY, stY, BW, BH, 20);
+    drawButtons(bX, sY, pY, stY, BW, BH);
+
+    // 4. 音乐按钮
+    musicPlayer.Draw();
+}
+
+
+// ========================================================
+//                 UI 输入（鼠标处理）
+// ========================================================
+
+void handleMenuMouse()
+{
+    ExMessage msg;
+    while (peekmessage(&msg, EM_MOUSE))
+    {
+        // 音乐按钮
+        if (musicPlayer.HandleMouseInput(msg.x, msg.y, msg.message))
+            continue;
+
+        // 模型选择按钮（Model1/Model2/Model3）
+        int x, m1, m2, m3, w, h;
+        initButtons(x, m1, m2, m3, w, h, 80);
+        handleMouseInput(x, m1, m2, m3, w, h);
+
+        if (getmodel1ButtonState()) { currentModel = ModelType::SLOPE; resetModelSelection(); }
+        if (getmodel2ButtonState()) { currentModel = ModelType::COLLISION; resetModelSelection(); }
+        if (getmodel3ButtonState()) { currentModel = ModelType::MODEL3; resetModelSelection(); }
+
+        // Model3 子模型按钮（三选一）
+        if (currentModel == ModelType::MODEL3)
+        {
+            int sbX, s1Y, s2Y, s3Y, sbW, sbH;
+            initSceneModelButtons(sbX, s1Y, s2Y, s3Y, sbW, sbH);
+            handleSceneModelMouseInput(sbX, s1Y, s2Y, s3Y, sbW, sbH);
+
+            if (getSphereCreationButtonState()) { model3SubScene = 0; resetModelSelection(); }
+            if (getTwoStarsButtonState())       { model3SubScene = 1; resetModelSelection(); }
+            if (getSolarSysButtonState())       { model3SubScene = 2; resetModelSelection(); }
+        }
+    }
+}
+
+
+// ========================================================
+//                 主菜单运行函数（供 main.cpp 调用）
+// ========================================================
+
+void runMenu()
+{
+    // 参数初始化
+    SlopeParams slopeParams;
+    slopeParams.top_x = 200; slopeParams.top_y = 200;
+    slopeParams.bottom_x = 400; slopeParams.bottom_y = 450;
+    slopeParams.mu = 0.2;
+    slopeParams.ball = { 200, 200, 0, 0, 20, 3 };
+
+    CollisionParams colParams;
+    colParams.b1 = { 300, 350, 100, 0, 25, 3 };
+    colParams.b2 = { 600, 350, -80, 0, 30, 3 };
+
+    while (true)
+    {
         renderer.BeginFrame();
 
-        // draw background first
-        bg.UpdateAndDraw();
+        if (appState == AppState::MENU)
+        {
+            drawMenuUI();
+            handleMenuMouse();
+        }
+        else if (appState == AppState::DEMO_RUNNING)
+        {
+            background.UpdateAndDraw();
 
-        // draw music button
-        // We'll process mouse messages below; for now draw the button (music state drawn inside)
-        musicBtn.Draw();
-
-        if (state == AppState::MENU) {
-            // Draw UI via renderer (title + placeholders)
-            renderer.DrawText("Physics Visualizer - Demo Selection", 20, 12, 24);
-            renderer.DrawButtonPlaceholder(30, 60, 300, 40, (model == ModelType::SLOPE ? "[X] Slope: ball rolls down" : "[ ] Slope: ball rolls down"));
-            renderer.DrawButtonPlaceholder(350, 60, 300, 40, (model == ModelType::COLLISION ? "[X] Collision: two balls" : "[ ] Collision: two balls"));
-
-            int y = 130;
-            renderer.DrawText("Parameters (use LEFT/RIGHT change, UP/DOWN navigate)", 20, y, 14);
-            y += 28;
-
-            if (model == ModelType::SLOPE) {
-                renderer.DrawText("Ramp top (m): x = " + std::to_string(slope.top_x) + "  y = " + std::to_string(slope.top_y), 30, y); y += 22;
-                renderer.DrawText("Ramp bottom (m): x = " + std::to_string(slope.bottom_x) + "  y = " + std::to_string(slope.bottom_y), 30, y); y += 22;
-                renderer.DrawText("Friction mu: " + std::to_string(slope.mu), 30, y); y += 22;
-                renderer.DrawText("Ball radius (m): " + std::to_string(slope.ball.radius) + "  mass (kg): " + std::to_string(slope.ball.mass), 30, y); y += 22;
-
-                // draw scene1 UI (4 buttons)
-                drawBtns(); // uses initBtns positions
+            if (currentModel == ModelType::SLOPE)
+            {
+                simulateSlope(slopeParams);
+                drawSlopePreview(slopeParams);
             }
-            else {
-                renderer.DrawText("Ball1: pos=(" + std::to_string(coll.b1.x) + "," + std::to_string(coll.b1.y) + ")  vx=" + std::to_string(coll.b1.vx), 30, y); y += 22;
-                renderer.DrawText("Ball2: pos=(" + std::to_string(coll.b2.x) + "," + std::to_string(coll.b2.y) + ")  vx=" + std::to_string(coll.b2.vx), 30, y); y += 22;
-
-                // draw scene2 UI (8 buttons)
-                drawBtns2();
+            else if (currentModel == ModelType::COLLISION)
+            {
+                simulateCollision(colParams);
+                drawCollisionPreview(colParams);
             }
-
-            // draw preview area
-            int previewX = 30;
-            int previewY = 380;
-            int previewW = 800;
-            int previewH = 300;
-            setlinecolor(BLACK);
-            rectangle(previewX - 2, previewY - 2, previewX + previewW + 2, previewY + previewH + 2);
-
-            if (model == ModelType::SLOPE) {
-                RampData rp;
-                rp.x1 = slope.top_x; rp.y1 = slope.top_y;
-                rp.x2 = slope.bottom_x; rp.y2 = slope.bottom_y;
-                rp.mu = slope.mu;
-                renderer.DrawRamp(rp);
-                BallData b = slope.ball;
-                renderer.DrawBall(b);
+            else if (currentModel == ModelType::MODEL3)
+            {
+                if (model3SubScene == 0) drawScene3_sphereCreation();
+                if (model3SubScene == 1) drawScene3_twoStars();
+                if (model3SubScene == 2) drawScene3_solarSystem();
             }
-            else {
-                renderer.DrawBall(coll.b1);
-                renderer.DrawBall(coll.b2);
-            }
-
-            // keyboard handling (menu)
-            if (_kbhit()) {
-                int ch = _getch();
-                if (ch == 0 || ch == 0xE0) {
-                    int ch2 = _getch();
-                    if (ch2 == 72) menuIndex = std::max(0, menuIndex - 1);
-                    else if (ch2 == 80) menuIndex = std::min(maxMenu, menuIndex + 1);
-                    else if (ch2 == 75) {
-                        if (model == ModelType::SLOPE) {
-                            if (menuIndex == 1) slope.top_x = std::max(0.2, slope.top_x - 0.1);
-                            else if (menuIndex == 2) slope.bottom_x = std::max(0.2, slope.bottom_x - 0.1);
-                            else if (menuIndex == 3) slope.mu = std::max(0.0, slope.mu - 0.01);
-                        }
-                        else {
-                            if (menuIndex == 1) coll.b1.vx -= 0.1;
-                            else if (menuIndex == 2) coll.b2.vx += 0.1;
-                        }
-                    }
-                    else if (ch2 == 77) {
-                        if (model == ModelType::SLOPE) {
-                            if (menuIndex == 1) slope.top_x += 0.1;
-                            else if (menuIndex == 2) slope.bottom_x += 0.1;
-                            else if (menuIndex == 3) slope.mu += 0.01;
-                        }
-                        else {
-                            if (menuIndex == 1) coll.b1.vx += 0.1;
-                            else if (menuIndex == 2) coll.b2.vx -= 0.1;
-                        }
-                    }
-                }
-                else {
-                    if (ch == 13) {
-                        simTime = 0.0;
-                        slope.ball.x = slope.top_x;
-                        slope.ball.y = slope.top_y + slope.ball.radius + 0.001;
-                        slope.ball.vx = slope.ball.vy = 0.0;
-                        coll.b1 = coll_init.b1;
-                        coll.b2 = coll_init.b2;
-                        state = AppState::DEMO_RUNNING;
-                        paused = false;
-                    }
-                    else if (ch == 27) {
-                        quit = true;
-                    }
-                    else if (ch == ' ') {
-                        model = (model == ModelType::SLOPE ? ModelType::COLLISION : ModelType::SLOPE);
-                    }
-                    else if (ch == 'r' || ch == 'R') {
-                        slope = slope_init;
-                        coll = coll_init;
-                    }
-                    else if (ch == '1') {
-                        model = ModelType::SLOPE;
-                    }
-                    else if (ch == '2') {
-                        model = ModelType::COLLISION;
-                    }
-                }
-            }
-
-            // mouse handling for UI modules (music + button panels)
-            ExMessage m;
-            while (peekmessage(&m, EM_MOUSE)) {
-                // pass to music button first
-                if (m.message == WM_MOUSEMOVE || m.message == WM_LBUTTONDOWN) {
-                    bool consumed = musicBtn.HandleMouseInput(m.x, m.y, m.message);
-                    if (!consumed) {
-                        // pass to scene panels
-                        if (model == ModelType::SLOPE) {
-                            // pass to 4-button updater
-                            updBtns();
-                        }
-                        else {
-                            updBtns2();
-                        }
-                    }
-                }
-            }
-
-        } // end MENU
-
-        else if (state == AppState::DEMO_RUNNING || state == AppState::DEMO_PAUSED) {
-            renderer.DrawText("Press Space to Pause/Resume. Press any key to restart from menu.", 20, 12, 14);
-
-            if (model == ModelType::SLOPE) {
-                RampData rp;
-                rp.x1 = slope.top_x; rp.y1 = slope.top_y;
-                rp.x2 = slope.bottom_x; rp.y2 = slope.bottom_y;
-                rp.mu = slope.mu;
-                renderer.DrawRamp(rp);
-
-                double rx = rp.x2 - rp.x1;
-                double ry = rp.y2 - rp.y1;
-                double L = sqrt(rx * rx + ry * ry);
-                double ux = rx / L, uy = ry / L;
-                double bx = slope.ball.x, by = slope.ball.y;
-                double vx = slope.ball.vx, vy = slope.ball.vy;
-
-                double sx = (bx - rp.x1) * ux + (by - rp.y1) * uy;
-
-                if (!paused) {
-                    double grav_comp = (0.0) * ux + (-g) * uy;
-                    double a_gravity_along = -grav_comp;
-                    double theta = atan2(rp.y2 - rp.y1, rp.x2 - rp.x1);
-                    double a_fric = slope.mu * g * fabs(cos(theta));
-                    double v_along = vx * ux + vy * uy;
-                    double a_along = a_gravity_along - (v_along > 0 ? a_fric : -a_fric);
-
-                    v_along += a_along * dt;
-                    sx += v_along * dt;
-
-                    if (sx < 0) { sx = 0; v_along = 0; }
-                    if (sx > L) { sx = L; v_along = 0; }
-
-                    double newx = rp.x1 + ux * sx;
-                    double newy = rp.y1 + uy * sx;
-
-                    slope.ball.x = newx;
-                    slope.ball.y = newy;
-                    slope.ball.vx = v_along * ux;
-                    slope.ball.vy = v_along * uy;
-
-                    simTime += dt;
-                }
-
-                renderer.DrawBall(slope.ball);
-
-                if (_kbhit()) {
-                    int c = _getch();
-                    if (c == ' ') { paused = !paused; }
-                    else if (c == 27) {
-                        state = AppState::MENU;
-                        slope = slope_init;
-                        paused = false;
-                    }
-                    else {
-                        slope = slope_init;
-                        simTime = 0.0;
-                    }
-                }
-            }
-            else {
-                renderer.DrawBall(coll.b1);
-                renderer.DrawBall(coll.b2);
-
-                if (!paused) {
-                    coll.b1.x += coll.b1.vx * dt;
-                    coll.b2.x += coll.b2.vx * dt;
-
-                    double dx = coll.b2.x - coll.b1.x;
-                    double dy = coll.b2.y - coll.b1.y;
-                    double dist = sqrt(dx * dx + dy * dy);
-                    double minDist = coll.b1.radius + coll.b2.radius;
-                    if (dist <= minDist) {
-                        double nx = dx / dist;
-                        double ny = dy / dist;
-                        double rvx = coll.b2.vx - coll.b1.vx;
-                        double rvy = coll.b2.vy - coll.b1.vy;
-                        double relVelAlong = rvx * nx + rvy * ny;
-                        if (relVelAlong < 0) {
-                            double e = 1.0;
-                            double j = -(1 + e) * relVelAlong / (1.0 / coll.b1.mass + 1.0 / coll.b2.mass);
-                            coll.b1.vx -= j * nx / coll.b1.mass;
-                            coll.b1.vy -= j * ny / coll.b1.mass;
-                            coll.b2.vx += j * nx / coll.b2.mass;
-                            coll.b2.vy += j * ny / coll.b2.mass;
-                            double overlap = minDist - dist;
-                            coll.b1.x -= nx * overlap * (coll.b2.mass / (coll.b1.mass + coll.b2.mass));
-                            coll.b2.x += nx * overlap * (coll.b1.mass / (coll.b1.mass + coll.b2.mass));
-                        }
-                    }
-                }
-
-                if (_kbhit()) {
-                    int c = _getch();
-                    if (c == ' ') paused = !paused;
-                    else if (c == 27) { state = AppState::MENU; coll = coll_init; }
-                    else { coll = coll_init; }
-                }
-            }
-
-            // During demo, still allow music clicks & global control buttons (start/pause/stop)
-            ExMessage m;
-            while (peekmessage(&m, EM_MOUSE)) {
-                musicBtn.HandleMouseInput(m.x, m.y, m.message);
-                // global control panel (optional) could be integrated here
-            }
-        } // end DEMO
+        }
 
         renderer.EndFrame();
-    } // end main loop
-
-    // cleanup
-    musicBtn.Cleanup();
-
-    return 0;
+        Sleep(10);
+    }
 }
