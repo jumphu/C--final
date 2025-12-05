@@ -1,5 +1,5 @@
 // menu_integrated.cpp
-// Ìæ»»Ô­ menu.cpp£¬ÓÃÓÚÕûºÏ±³¾°¡¢°´Å¥¡¢ÒôÀÖ¡¢äÖÈ¾
+// ï¿½æ»»Ô­ menu.cppï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Å¥ï¿½ï¿½ï¿½ï¿½ï¿½Ö¡ï¿½ï¿½ï¿½È¾
 #include "Renderer.h"
 #include "background_integrated.h"
 #include "allbottums.h"
@@ -162,8 +162,11 @@ int main() {
                     }
                 }
                 else {
-                    if (ch == 13) {
+                    // normal key
+                    if (ch == 13) { // Enter -> start
+                        // reset sim state
                         simTime = 0.0;
+                        // reset positions from parameters
                         slope.ball.x = slope.top_x;
                         slope.ball.y = slope.top_y + slope.ball.radius + 0.001;
                         slope.ball.vx = slope.ball.vy = 0.0;
@@ -172,10 +175,11 @@ int main() {
                         state = AppState::DEMO_RUNNING;
                         paused = false;
                     }
-                    else if (ch == 27) {
+                    else if (ch == 27) { // Esc
                         quit = true;
                     }
                     else if (ch == ' ') {
+                        // toggle model selection quick
                         model = (model == ModelType::SLOPE ? ModelType::COLLISION : ModelType::SLOPE);
                     }
                     else if (ch == 'r' || ch == 'R') {
@@ -191,60 +195,73 @@ int main() {
                 }
             }
 
-            // mouse handling for UI modules (music + button panels)
-            ExMessage m;
-            while (peekmessage(&m, EM_MOUSE)) {
-                // pass to music button first
-                if (m.message == WM_MOUSEMOVE || m.message == WM_LBUTTONDOWN) {
-                    bool consumed = musicBtn.HandleMouseInput(m.x, m.y, m.message);
-                    if (!consumed) {
-                        // pass to scene panels
-                        if (model == ModelType::SLOPE) {
-                            // pass to 4-button updater
-                            updBtns();
-                        }
-                        else {
-                            updBtns2();
-                        }
-                    }
-                }
-            }
-
-        } // end MENU
-
+        }
         else if (state == AppState::DEMO_RUNNING || state == AppState::DEMO_PAUSED) {
+            // Simulation drawing
             renderer.DrawText("Press Space to Pause/Resume. Press any key to restart from menu.", 20, 12, 14);
 
             if (model == ModelType::SLOPE) {
-                RampData rp;
-                rp.x1 = slope.top_x; rp.y1 = slope.top_y;
-                rp.x2 = slope.bottom_x; rp.y2 = slope.bottom_y;
-                rp.mu = slope.mu;
+                RampData rp = buildRamp(slope);
                 renderer.DrawRamp(rp);
 
+                // Simulation of ball sliding down ramp (no rotational dynamics)
+                // Parametrization: compute along-ramp coordinates
                 double rx = rp.x2 - rp.x1;
                 double ry = rp.y2 - rp.y1;
                 double L = sqrt(rx * rx + ry * ry);
-                double ux = rx / L, uy = ry / L;
+                double ux = rx / L, uy = ry / L; // unit vector from top->bottom
+
+                // position along ramp s: we can store s via ball position projection
                 double bx = slope.ball.x, by = slope.ball.y;
+                // project (bx,by) onto ramp vector from top
                 double vx = slope.ball.vx, vy = slope.ball.vy;
 
+                // compute current s (meters) from top
                 double sx = (bx - rp.x1) * ux + (by - rp.y1) * uy;
 
                 if (!paused) {
-                    double grav_comp = (0.0) * ux + (-g) * uy;
+                    // acceleration along ramp: a = g*( -sin(theta) ) + friction
+                    // but careful with sign: if ramp vector points down, gravity component along ramp = -g * sin(alpha_ramp)
+                    // compute angle of ramp relative to horizontal
+                    double alpha = atan2(rp.y2 - rp.y1, rp.x2 - rp.x1); // radians
+                    // component of gravity along ramp (toward bottom) = -g * sin(alpha_downward)
+                    // Better: gravitational acceleration vector = (0, -g). project onto unit vector (ux,uy)
+                    double ag = (0.0 * ux + (-g) * uy); // dot product gvec . u
+                    // Normal force magnitude per unit mass = g * cos(theta_projection)
+                    double normal_acc = fabs((0.0 * (-uy) + (-g) * ux)); // not used directly
+                    // friction acceleration magnitude = mu * g * cos(theta) but direction opposite velocity along ramp
+                    double cos_theta = fabs(((-g) * ux) / g); // not robust; simpler compute cos from geometry
+                    // compute slope angle relative to horizontal
+                    double slopeAngle = atan2(rp.y1 - rp.y2, rp.x2 - rp.x1); // angle downward
+                    // Simpler and robust approach:
+                    double angle_down = atan2(rp.y1 - rp.y2, rp.x2 - rp.x1); // positive if down to right
+                    // Use scalar: gravity component along ramp toward bottom:
+                    double grav_along = g * sin(atan2(rp.y1 - rp.y2, rp.x2 - rp.x1)); // might have sign issues
+                    // We'll instead compute exactly: unit vector pointing down (from top->bottom) is u=(ux,uy)
+                    // gravity vector = (0, -g)
+                    double grav_comp = (0.0) * ux + (-g) * uy; // negative if points opposite to u; we want toward bottom => -grav_comp
+                    // So acceleration along ramp toward bottom (positive if toward bottom):
                     double a_gravity_along = -grav_comp;
-                    double theta = atan2(rp.y2 - rp.y1, rp.x2 - rp.x1);
-                    double a_fric = slope.mu * g * fabs(cos(theta));
+                    // friction acceleration magnitude:
+                    double a_friction = slope.mu * g * fabs(ux * (-uy) + uy * ux); // this is hacky
+                    // Better: friction = mu * g * cos(theta); cos(theta) = dot(n, gdir) ??? To avoid complexity, use:
+                    // compute angle of ramp relative to horizontal
+                    double theta = atan2(rp.y2 - rp.y1, rp.x2 - rp.x1); // top->bottom vector angle
+                    double a_fric = slope.mu * g * cos(theta);
+                    // Sign: friction opposes velocity along ramp
+                    // current velocity along ramp:
                     double v_along = vx * ux + vy * uy;
                     double a_along = a_gravity_along - (v_along > 0 ? a_fric : -a_fric);
 
+                    // update velocity and s using semi-implicit Euler
                     v_along += a_along * dt;
                     sx += v_along * dt;
 
+                    // clamp
                     if (sx < 0) { sx = 0; v_along = 0; }
                     if (sx > L) { sx = L; v_along = 0; }
 
+                    // compute new world position
                     double newx = rp.x1 + ux * sx;
                     double newy = rp.y1 + uy * sx;
 
@@ -256,47 +273,62 @@ int main() {
                     simTime += dt;
                 }
 
+                // draw ball
                 renderer.DrawBall(slope.ball);
 
+                // check input for pause/resume/restart/return to menu
                 if (_kbhit()) {
                     int c = _getch();
                     if (c == ' ') { paused = !paused; }
-                    else if (c == 27) {
+                    else if (c == 27) { // Esc return to menu
                         state = AppState::MENU;
+                        // reset to initial
                         slope = slope_init;
                         paused = false;
                     }
                     else {
+                        // any other key -> restart demo from top
                         slope = slope_init;
                         simTime = 0.0;
                     }
                 }
+
             }
-            else {
+            else { // COLLISION model
+                // Draw static ground and two balls
+                // Integrate simple 1D elastic collision along x axis (y const)
                 renderer.DrawBall(coll.b1);
                 renderer.DrawBall(coll.b2);
 
                 if (!paused) {
+                    // update pos
                     coll.b1.x += coll.b1.vx * dt;
                     coll.b2.x += coll.b2.vx * dt;
 
+                    // collision detection (circle overlap)
                     double dx = coll.b2.x - coll.b1.x;
                     double dy = coll.b2.y - coll.b1.y;
                     double dist = sqrt(dx * dx + dy * dy);
                     double minDist = coll.b1.radius + coll.b2.radius;
                     if (dist <= minDist) {
+                        // simple elastic collision along the line connecting centers
+                        // compute normal
                         double nx = dx / dist;
                         double ny = dy / dist;
+                        // relative velocity along normal
                         double rvx = coll.b2.vx - coll.b1.vx;
                         double rvy = coll.b2.vy - coll.b1.vy;
                         double relVelAlong = rvx * nx + rvy * ny;
                         if (relVelAlong < 0) {
-                            double e = 1.0;
+                            // compute impulse scalar (1D)
+                            double e = 1.0; // restitution
                             double j = -(1 + e) * relVelAlong / (1.0 / coll.b1.mass + 1.0 / coll.b2.mass);
+                            // apply impulse
                             coll.b1.vx -= j * nx / coll.b1.mass;
                             coll.b1.vy -= j * ny / coll.b1.mass;
                             coll.b2.vx += j * nx / coll.b2.mass;
                             coll.b2.vy += j * ny / coll.b2.mass;
+                            // push them apart minimally
                             double overlap = minDist - dist;
                             coll.b1.x -= nx * overlap * (coll.b2.mass / (coll.b1.mass + coll.b2.mass));
                             coll.b2.x += nx * overlap * (coll.b1.mass / (coll.b1.mass + coll.b2.mass));
@@ -304,6 +336,7 @@ int main() {
                     }
                 }
 
+                // key handling
                 if (_kbhit()) {
                     int c = _getch();
                     if (c == ' ') paused = !paused;
@@ -311,20 +344,10 @@ int main() {
                     else { coll = coll_init; }
                 }
             }
-
-            // During demo, still allow music clicks & global control buttons (start/pause/stop)
-            ExMessage m;
-            while (peekmessage(&m, EM_MOUSE)) {
-                musicBtn.HandleMouseInput(m.x, m.y, m.message);
-                // global control panel (optional) could be integrated here
-            }
-        } // end DEMO
+        }
 
         renderer.EndFrame();
-    } // end main loop
-
-    // cleanup
-    musicBtn.Cleanup();
+    }
 
     return 0;
 }
