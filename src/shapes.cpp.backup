@@ -44,55 +44,70 @@ void Shape::applyGravity(double g) {
     totalforce[1] += -g * mass;
 }
 
-void Shape::applyFriction(double normalForce, double kineticFriction, double staticFriction, double drivingForce) {
+void Shape::applyFriction(double normalForce, double frictionCoefficient) {
+    // 计算摩擦力大小: f = μ * N
+    double frictionMagnitude = frictionCoefficient * normalForce;
+    
+    // 获取当前速度（相对于静止表面，即绝对速度）
     double vx = velocity[0];
-    double speed = std::abs(vx);
-
-    // 检查是否处于静止状态（使用更小的阈值）
-    if (speed < 0.01) {  // 降低阈值从 0.1 到 0.01
-        double maxStaticFriction = staticFriction * normalForce;
-        if (std::abs(drivingForce) <= maxStaticFriction) {
-            // 静摩擦力足以抵消驱动力
-            addToTotalForce(-drivingForce, 0.0);
-            // 同时将速度设为0，防止微小的累积
-            velocity[0] = 0.0;
-            return;
-        }
-    }
-
-    // 应用动摩擦力
-    double frictionMagnitude = kineticFriction * normalForce;
+    double vy = velocity[1];
+    
+    // 计算速度的大小
+    double speed = std::sqrt(vx * vx + vy * vy);
+    
+    // 如果速度几乎为零，不施加摩擦力（避免除零和抖动）
     if (speed < 1e-6) {
         return;
     }
-    double dirX = -vx / speed;
-    addToTotalForce(frictionMagnitude * dirX, 0.0);
+    
+    // 摩擦力方向与速度方向相反
+    // 归一化速度向量得到单位方向向量
+    double dirX = -vx / speed;  // 负号表示与速度相反
+    double dirY = -vy / speed;
+    
+    // 计算摩擦力分量: F_friction = f * direction
+    double frictionX = frictionMagnitude * dirX;
+    double frictionY = frictionMagnitude * dirY;
+    
+    // 检查摩擦力是否会使速度反向（防止振荡）
+    // 如果摩擦力太大，会导致速度在下一时间步反向，这是不物理的
+    // 我们不在这里截断，而是在 applyTotalForce 中处理
+    
+    // 累加摩擦力到合力
+    addToTotalForce(frictionX, frictionY);
 }
 
-void Shape::applyFrictionRelative(double normalForce, double kineticFriction, double staticFriction, double otherVx, double otherVy, double drivingForce) {
-    double vx = velocity[0];
-    double relVx = vx - otherVx;
-    double relSpeed = std::abs(relVx);
-
-    // 检查是否处于相对静止状态（使用更小的阈值）
-    if (relSpeed < 0.01) {  // 降低阈值从 0.1 到 0.01
-        double maxStaticFriction = staticFriction * normalForce;
-        if (std::abs(drivingForce) <= maxStaticFriction) {
-            // 静摩擦力足以抵消驱动力
-            addToTotalForce(-drivingForce, 0.0);
-            // 同时将相对速度设为0，防止微小的累积
-            velocity[0] = otherVx;
-            return;
-        }
-    }
+void Shape::applyFrictionRelative(double normalForce, double frictionCoefficient, double otherVx, double otherVy) {
+    // 计算摩擦力大小: f = μ * N
+    double frictionMagnitude = frictionCoefficient * normalForce;
     
-    // 应用动摩擦力
-    double frictionMagnitude = kineticFriction * normalForce;
+    // 获取当前物体的速度
+    double vx = velocity[0];
+    double vy = velocity[1];
+    
+    // 计算相对速度（当前物体相对于接触表面的速度）
+    double relVx = vx - otherVx;
+    double relVy = vy - otherVy;
+    
+    // 计算相对速度的大小
+    double relSpeed = std::sqrt(relVx * relVx + relVy * relVy);
+    
+    // 如果相对速度几乎为零，不施加摩擦力（避免除零和抖动）
     if (relSpeed < 1e-6) {
         return;
     }
-    double dirX = -relVx / relSpeed;
-    addToTotalForce(frictionMagnitude * dirX, 0.0);
+    
+    // 摩擦力方向与相对速度方向相反
+    // 归一化相对速度向量得到单位方向向量
+    double dirX = -relVx / relSpeed;  // 负号表示与相对速度相反
+    double dirY = -relVy / relSpeed;
+    
+    // 计算摩擦力分量: F_friction = f * direction
+    double frictionX = frictionMagnitude * dirX;
+    double frictionY = frictionMagnitude * dirY;
+    
+    // 累加摩擦力到合力
+    addToTotalForce(frictionX, frictionY);
 }
 
 double Shape::getMass() const {
@@ -112,13 +127,6 @@ void Shape::getVelocity(double& vx, double& vy) const {
 void Shape::getFraction(double& f) const {
     f = fraction;
 }
-
-// 暂时注释掉，调试编译问题
-/*
-void Shape::getStaticFriction(double& sf) const {
-    sf = static_fraction;
-}
-*/
 
 void Shape::getRestitution(double& r) const {
     r = restitution;
@@ -165,42 +173,20 @@ void Shape::applyTotalForce(double deltaTime) {
         double ax = totalforce[0] / mass;
         double ay = totalforce[1] / mass;
         
-        // 计算速度变化
-        double deltaVx = ax * deltaTime;
-        double deltaVy = ay * deltaTime;
-        
         // 计算新速度
-        double new_vx = velocity[0] + deltaVx;
-        double new_vy = velocity[1] + deltaVy;
+        double new_vx = velocity[0] + ax * deltaTime;
+        double new_vy = velocity[1] + ay * deltaTime;
         
-        // 检查是否由于摩擦力导致速度反向
-        // 只有当速度方向改变，且加速度与原速度方向相反时，才认为是摩擦力导致的过度减速
-        // 这种情况下应该将速度设为0，而不是反向
-        
-        // X方向检查
-        if (velocity[0] != 0.0 && new_vx * velocity[0] < 0) {
-            // 速度反向了
-            // 检查是否是摩擦力导致的（加速度与速度反向）
-            if (ax * velocity[0] < 0) {
-                // 加速度与速度反向，可能是摩擦力过大
-                velocity[0] = 0.0;
-            } else {
-                // 加速度与速度同向或垂直，这是正常的物理行为
-                velocity[0] = new_vx;
-            }
+        // 检查速度是否反向（防止摩擦力过大导致的振荡）
+        // 如果速度反向，说明摩擦力过大，应该直接停止
+        if (velocity[0] * new_vx < 0) {  // X方向速度反向
+            velocity[0] = 0.0;
         } else {
             velocity[0] = new_vx;
         }
         
-        // Y方向检查
-        if (velocity[1] != 0.0 && new_vy * velocity[1] < 0) {
-            // 速度反向了
-            if (ay * velocity[1] < 0) {
-                // 加速度与速度反向，可能是摩擦力过大
-                velocity[1] = 0.0;
-            } else {
-                velocity[1] = new_vy;
-            }
+        if (velocity[1] * new_vy < 0) {  // Y方向速度反向
+            velocity[1] = 0.0;
         } else {
             velocity[1] = new_vy;
         }
@@ -236,8 +222,6 @@ void Shape::checkSupportStatus(const Shape& supporter_candidate) {
     // 如果相对Y速度很小（接近0或向下速度很小），认为被支撑
     if (std::abs(relVy) < 0.5) {  // 阈值可调整
         isSupported = true;
-        // ✅ 修复：设置支撑者指针
-        supporter = const_cast<Shape*>(&supporter_candidate);
     }
 }
 
@@ -333,8 +317,7 @@ bool Circle::check_collision(const Shape& other) const {
         double dx = mass_centre[0] - other_circle->mass_centre[0];
         double dy = mass_centre[1] - other_circle->mass_centre[1];
         double distance = std::sqrt(dx * dx + dy * dy);
-        // ✅ 修复：使用 <= 以包含相切情况
-        return distance <= (radius + other_circle->radius);
+        return distance < (radius + other_circle->radius);
     }
     
     // 尝试将other转换为AABB
@@ -350,11 +333,10 @@ bool Circle::check_collision(const Shape& other) const {
         double dy = mass_centre[1] - closest_y;
         double distance = std::sqrt(dx * dx + dy * dy);
         
-        // ✅ 修复：使用 <= 以包含相切情况
-        return distance <= radius;
+        return distance < radius;
     }
     
-    // 尝试将other转换为Wall（静态矩形障害物）
+    // 尝试将other转换为Wall（静态矩形障碍物）
     const Wall* other_wall = dynamic_cast<const Wall*>(&other);
     if (other_wall) {
         // Circle与Wall的碰撞检测
@@ -367,13 +349,11 @@ bool Circle::check_collision(const Shape& other) const {
         double dy = mass_centre[1] - closest_y;
         double distance = std::sqrt(dx * dx + dy * dy);
         
-        // 更精确：包含相切
-        return distance <= radius;
+        return distance < radius;
     }
     
     // 尝试将other转换为Slope（静态斜坡）
-
-const Slope* other_slope = dynamic_cast<const Slope*>(&other);
+    const Slope* other_slope = dynamic_cast<const Slope*>(&other);
     if (other_slope) {
         // Circle与Slope的碰撞检测（简化：使用距离判断）
         double dx = mass_centre[0] - other_slope->mass_centre[0];
@@ -424,7 +404,7 @@ bool AABB::check_collision(const Shape& other) const {
         return !(left1 > right2 || right1 < left2 || bottom1 > top2 || top1 < bottom2);
     }
     
-    // 尝试将other转换为Wall（静态矩形障害物）
+    // 尝试将other转换为Wall（静态矩形障碍物）
     const Wall* other_wall = dynamic_cast<const Wall*>(&other);
     if (other_wall) {
         // AABB与Wall的碰撞检测
@@ -491,31 +471,61 @@ Shape* AABB::getCompressedShapeUp() const {
 }
 
 void AABB::applyFrictionUP() {
-    // 此函数逻辑复杂且当前未使用，暂时注释以解决编译问题
-    /*
-    Shape* compressedShape = getCompressedShapeUp();
-    if (compressedShape) {
-        double normalForce = compressedShape->getNormalForceABS();
-        double fraction = compressedShape->fraction;
+    // 获取上方被压缩的物体
+    Shape* compressedShapeUp = getCompressedShapeUp();
+    
+    if (compressedShapeUp) {
+        // 获取上方物体给当前AABB施加的弹力
+        double fx, fy;
+        compressedShapeUp->getNormalForce(fx, fy);
+        
+        // 正压力就是弹力的Y分量（向下）
+        double normalForce = std::abs(fy);
+        
+        if (normalForce < 1e-6) {
+            return; // 没有正压力，不施加摩擦力
+        }
+        
+        // 获取上方物体速度
         double vx2, vy2;
-        compressedShape->getVelocity(vx2, vy2);
-        applyFrictionRelative(normalForce, fraction, static_fraction, vx2, vy2, totalforce[0]);
+        compressedShapeUp->getVelocity(vx2, vy2);
+        
+        // 使用相对速度摩擦力
+        applyFrictionRelative(normalForce, fraction, vx2, vy2);
     }
-    */
 }
 
 void AABB::applyFrictionDOWN() {
-    // 此函数逻辑复杂且当前未使用，暂时注释以解决编译问题
-    /*
-	Shape* compressedShape = getCompressedShapeDown();
-	if (compressedShape) {
-		double normalForce = getNormalForceABS();
-		double otherFraction = compressedShape->fraction;
-		double vx2, vy2;
-		compressedShape->getVelocity(vx2, vy2);
-		applyFrictionRelative(normalForce, otherFraction, static_fraction, vx2, vy2, totalforce[0]);
-	}
-    */
+    // 获取下方被压缩的物体
+    Shape* compressedShapeDown = getCompressedShapeDown();
+    
+    if (compressedShapeDown) {
+        // 获取上方被压缩的物体
+        Shape* compressedShapeUp = getCompressedShapeUp();
+        
+        // 计算正压力：自身重力 + 上方所有物体的重力
+        double normalForce = mass * 9.8;
+        
+        // 如果上方有物体，累加其质量产生的压力
+        if (compressedShapeUp) {
+            normalForce += compressedShapeUp->getMass() * 9.8;
+        }
+        
+        // 保存施加到下方物体的法向力（用于下方物体计算摩擦力）
+        normalforce[0] = 0.0;
+        normalforce[1] = -normalForce;  // 向下
+        
+        // 使用下方物体的摩擦系数
+        double otherFraction;
+        compressedShapeDown->getFraction(otherFraction);
+        
+        // 获取下方物体的速度
+        double vx2, vy2;
+        compressedShapeDown->getVelocity(vx2, vy2);
+        
+        // 使用相对速度摩擦力
+        applyFrictionRelative(normalForce, otherFraction, vx2, vy2);
+    }
 }
 
 /*=========================================================================================================
@@ -524,8 +534,45 @@ void AABB::applyFrictionDOWN() {
  *=========================================================================================================*/
 
 bool Slope::check_collision(const Shape& other) const {
+    // Slope 作为静态物体，只检测与其他静态物体的碰撞（用于编辑器）
+    // 动态物体会自己检测与 Slope 的碰撞
+    
+    // 尝试将other转换为Slope
+    const Slope* other_slope = dynamic_cast<const Slope*>(&other);
+    if (other_slope) {
+        // Slope与Slope的碰撞检测（简化：使用质心距离）
+        double dx = mass_centre[0] - other_slope->mass_centre[0];
+        double dy = mass_centre[1] - other_slope->mass_centre[1];
+        double distance = std::sqrt(dx * dx + dy * dy);
+        
+        // 如果距离小于两个斜坡的长度之和，认为可能重叠
+        return distance < (length + other_slope->length) / 2.0;
+    }
+    
+    // 尝试将other转换为Wall
+    const Wall* other_wall = dynamic_cast<const Wall*>(&other);
+    if (other_wall) {
+        // Slope与Wall的碰撞检测（简化版本）
+        double dx = mass_centre[0] - other_wall->mass_centre[0];
+        double dy = mass_centre[1] - other_wall->mass_centre[1];
+        double distance = std::sqrt(dx * dx + dy * dy);
+        
+        // 简化判定
+        return distance < (length + other_wall->getWidth() + other_wall->getHeight()) / 2.0;
+    }
+    
     // Slope 不主动检测与动态物体的碰撞
     return false;
+}
+
+double Slope::getBottom() const {
+    // 斜坡底部是质心位置（简化）
+    return mass_centre[1];
+}
+
+double Slope::getTop() const {
+    // 斜坡顶部 = 质心 + 高度
+    return mass_centre[1] + getHeight();
 }
 
 double Slope::getAngleDegrees() const {
@@ -582,6 +629,50 @@ void Ground::setYLevel(double y) {
     mass_centre[1] = y;  // 同步更新质心Y坐标
 }
 
+/*=========================================================================================================
+ * Wall类方法实现
+ * 墙壁是静态矩形障碍物
+ * 注意：Wall 作为静态物体，只检测与其他静态物体的碰撞（用于编辑器）
+ *       动态物体会检测与 Wall 的碰撞，但 Wall 本身不主动检测动态物体
+ *=========================================================================================================*/
+
+bool Wall::check_collision(const Shape& other) const {
+    // 静态物体（Wall）只检测与其他静态物体的碰撞
+    // 这个函数主要用于编辑器或特殊场景中的静态物体布局检测
+    
+    // 尝试将other转换为Wall
+    const Wall* other_wall = dynamic_cast<const Wall*>(&other);
+    if (other_wall) {
+        // Wall与Wall的碰撞检测（AABB算法）
+        double left1 = getLeft();
+        double right1 = getRight();
+        double top1 = getTop();
+        double bottom1 = getBottom();
+        
+        double left2 = other_wall->getLeft();
+        double right2 = other_wall->getRight();
+        double top2 = other_wall->getTop();
+        double bottom2 = other_wall->getBottom();
+        
+        return !(left1 > right2 || right1 < left2 || bottom1 > top2 || top1 < bottom2);
+    }
+    
+    // 尝试将other转换为Slope（静态斜坡）
+    const Slope* other_slope = dynamic_cast<const Slope*>(&other);
+    if (other_slope) {
+        // Wall与Slope的碰撞检测（简化）
+        double dx = other_slope->mass_centre[0] - mass_centre[0];
+        double dy = other_slope->mass_centre[1] - mass_centre[1];
+        double distance = std::sqrt(dx * dx + dy * dy);
+        
+        // 简化判定
+        return distance < (width + height + other_slope->getLength()) / 2.0;
+    }
+    
+    // Wall 不主动检测与动态物体的碰撞
+    return false;
+}
+
 double Wall::getArea() const {
     return width * height;
 }
@@ -603,80 +694,5 @@ double Wall::distanceToPoint(double x, double y) const {
     double dx = std::max(getLeft() - x, std::max(0.0, x - getRight()));
     double dy = std::max(getBottom() - y, std::max(0.0, y - getTop()));
     return std::sqrt(dx * dx + dy * dy);
-}
-
-/*=========================================================================================================
- * Wall::check_collision - 检测墙壁与其他形状的碰撞
- * 
- * 墙壁是静态矩形，需要与各种动态形状进行碰撞检测
- *=========================================================================================================*/
-bool Wall::check_collision(const Shape& other) const {
-    // 尝试将other转换为Circle
-    const Circle* other_circle = dynamic_cast<const Circle*>(&other);
-    if (other_circle) {
-        // 墙壁（矩形）与圆形的碰撞检测
-        // 找到墙壁上离圆心最近的点
-        double circleX, circleY;
-        other_circle->getCentre(circleX, circleY);
-        
-        double closestX = std::max(getLeft(), std::min(circleX, getRight()));
-        double closestY = std::max(getBottom(), std::min(circleY, getTop()));
-        
-        double dx = circleX - closestX;
-        double dy = circleY - closestY;
-        double distance = std::sqrt(dx * dx + dy * dy);
-        
-        return distance <= other_circle->getRadius();
-    }
-    
-    // 尝试将other转换为AABB
-    const AABB* other_aabb = dynamic_cast<const AABB*>(&other);
-    if (other_aabb) {
-        // 墙壁（矩形）与AABB（矩形）的碰撞检测
-        double left1 = getLeft();
-        double right1 = getRight();
-        double top1 = getTop();
-        double bottom1 = getBottom();
-        
-        double left2 = other_aabb->getLeft();
-        double right2 = other_aabb->getRight();
-        double top2 = other_aabb->getTop();
-        double bottom2 = other_aabb->getBottom();
-        
-        return !(left1 > right2 || right1 < left2 || bottom1 > top2 || top1 < bottom2);
-    }
-    
-    // 尝试将other转换为Wall
-    const Wall* other_wall = dynamic_cast<const Wall*>(&other);
-    if (other_wall) {
-        // 墙壁与墙壁的碰撞检测（矩形与矩形）
-        double left1 = getLeft();
-        double right1 = getRight();
-        double top1 = getTop();
-        double bottom1 = getBottom();
-        
-        double left2 = other_wall->getLeft();
-        double right2 = other_wall->getRight();
-        double top2 = other_wall->getTop();
-        double bottom2 = other_wall->getBottom();
-        
-        return !(left1 > right2 || right1 < left2 || bottom1 > top2 || top1 < bottom2);
-    }
-    
-    // 尝试将other转换为Slope（静态斜坡）
-    const Slope* other_slope = dynamic_cast<const Slope*>(&other);
-    if (other_slope) {
-        // 墙壁与斜坡的碰撞检测（简化版本）
-        double dx = mass_centre[0] - other_slope->mass_centre[0];
-        double dy = mass_centre[1] - other_slope->mass_centre[1];
-        double distance = std::sqrt(dx * dx + dy * dy);
-        
-        // 简化判定：如果距离小于墙壁对角线的一半 + 斜坡长度的一半
-        double wallRadius = getDiagonal() / 2.0;
-        return distance < (wallRadius + other_slope->getLength() / 2.0);
-    }
-    
-    // 无法识别的类型，返回false
-    return false;
 }
 
