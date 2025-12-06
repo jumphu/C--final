@@ -6,7 +6,7 @@ using std::stack;
 
 stack<IMAGE> scrS2;
 
-int btnW2 = 140, BtnH2 = 40;
+int btnW2 = 120, BtnH2 = 40;
 int col1x2, col2x2, baseY2;
 int radius1BtnY2, mass1BtnY2, speed1BtnY2, color1BtnY2;
 int radius2BtnY2, mass2BtnY2, speed2BtnY2, color2BtnY2;
@@ -39,19 +39,19 @@ void restoreScr2() {
 }
 
 void initBtns2(int w, int h) {
-    baseY2 = h - 290;
-    col1x2 = w - btnW2 * 2 - 30;
-    col2x2 = w - btnW2 - 15;
+    baseY2 = h - 196 - 60;
+    col1x2 = w - btnW2 * 2 - 40;
+    col2x2 = w - btnW2 - 20;
 
     radius1BtnY2 = baseY2;
-    mass1BtnY2 = baseY2 + 55;
-    speed1BtnY2 = baseY2 + 110;
-    color1BtnY2 = baseY2 + 170;
+    mass1BtnY2 = radius1BtnY2 + 60;
+    speed1BtnY2 = mass1BtnY2 + 60;
+    color1BtnY2 = speed1BtnY2 + 60;
 
     radius2BtnY2 = baseY2;
-    mass2BtnY2 = baseY2 + 55;
-    speed2BtnY2 = baseY2 + 110;
-    color2BtnY2 = baseY2 + 170;
+    mass2BtnY2 = radius2BtnY2 + 60;
+    speed2BtnY2 = mass2BtnY2 + 60;
+    color2BtnY2 = speed2BtnY2 + 60;
 }
 
 void drawBtns2() {
@@ -262,3 +262,4 @@ float getMass2() {
 float getSpeed2() {
     return speed2Val;
 }
+

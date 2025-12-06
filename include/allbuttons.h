@@ -18,10 +18,11 @@ void resetButtonStates();
 bool getStartButtonState();
 bool getPauseButtonState();
 bool getStopButtonState();
-void drawButtons(int btnX, int startBtnY, int pauseBtnY, int stopBtnY, int btnW, int btnH);
-void handleMouseInput(int btnX, int startBtnY, int pauseBtnY, int stopBtnY, int btnW, int btnH);
+
+void drawButtons(int startBtnX, int pauseBtnX, int stopBtnX, int btnY, int btnW, int btnH);
+void handleMouseInput(int startBtnX, int pauseBtnX, int stopBtnX, int btnY, int btnW, int btnH);
 void checkButtonStates();
-void initButtons(int& btnX, int& startBtnY, int& pauseBtnY, int& stopBtnY, int& btnW, int& btnH, int margin);
+void initButtons(int& startBtnX, int& pauseBtnX, int& stopBtnX, int& btnY, int& btnW, int& btnH);
 
 // single-object scene (4 buttons)
 void initBtns(int w, int h);
@@ -108,5 +109,6 @@ void checkSceneModelButtonStates();
 void initSceneModelButtons(int& btnX, int& sphere_creationBtnY, int& two_starsBtnY, int& solar_sysBtnY, int& btnW, int& btnH, int margin = 20);
 
 #endif
+
 
 
