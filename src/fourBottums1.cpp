@@ -38,14 +38,14 @@ void restoreScr() {
 
 //初始化
 void initBtns(int w,int h) {
-    btnW=140; BtnH=40;
-    btnx=w-btnW-15;
-    int baseY=h-290;
+    btnW=120; BtnH=40;
+    btnx=w-btnW-20;
+    int baseY=h-(BtnH*4+20*3)-20;
     colrBtnY=baseY;
-    gravBtnY=baseY+55;
-    fricBtnY=baseY+110;
-    spdBtnY=baseY+170;
-}
+    gravBtnY=baseY+52;
+    fricBtnY=baseY+52*2;
+    spdBtnY=baseY+52*3;
+}   //4个按钮竖直排列在页面右下角，已将按钮大小修改为适合的大小
 
 //把按钮画出来
 void drawBtns() {
