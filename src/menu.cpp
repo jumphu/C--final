@@ -75,61 +75,33 @@ int main() {
     while (!quit) {
         renderer.BeginFrame();
 
-        // draw background first
-        bg.UpdateAndDraw();
+// ========================================================
+//              全局对象（菜单运行所需）
+// ========================================================
 
-        // draw music button
-        // We'll process mouse messages below; for now draw the button (music state drawn inside)
-        musicBtn.Draw();
+Renderer renderer(1280, 720);
+DigitalRainBackgroundIntegrated background;
+MusicPlayer musicPlayer(1180, 80, 50);   // 右上角音乐按钮
 
-        if (state == AppState::MENU) {
-            // Draw UI via renderer (title + placeholders)
-            renderer.DrawText("Physics Visualizer - Demo Selection", 20, 12, 24);
-            renderer.DrawButtonPlaceholder(30, 60, 300, 40, (model == ModelType::SLOPE ? "[X] Slope: ball rolls down" : "[ ] Slope: ball rolls down"));
-            renderer.DrawButtonPlaceholder(350, 60, 300, 40, (model == ModelType::COLLISION ? "[X] Collision: two balls" : "[ ] Collision: two balls"));
+// 当前程序状态
+AppState appState = AppState::MENU;
 
-            int y = 130;
-            renderer.DrawText("Parameters (use LEFT/RIGHT change, UP/DOWN navigate)", 20, y, 14);
-            y += 28;
+// 当前物理模型（场景1、场景2、场景3）
+ModelType currentModel = ModelType::SLOPE;
 
-            if (model == ModelType::SLOPE) {
-                renderer.DrawText("Ramp top (m): x = " + std::to_string(slope.top_x) + "  y = " + std::to_string(slope.top_y), 30, y); y += 22;
-                renderer.DrawText("Ramp bottom (m): x = " + std::to_string(slope.bottom_x) + "  y = " + std::to_string(slope.bottom_y), 30, y); y += 22;
-                renderer.DrawText("Friction mu: " + std::to_string(slope.mu), 30, y); y += 22;
-                renderer.DrawText("Ball radius (m): " + std::to_string(slope.ball.radius) + "  mass (kg): " + std::to_string(slope.ball.mass), 30, y); y += 22;
+// Model3：三个子模型（0=sphere creation, 1=two stars, 2=solar sys）
+int model3SubScene = -1;   // 未选择任何子模型
 
-                // draw scene1 UI (4 buttons)
-                drawBtns(); // uses initBtns positions
-            }
-            else {
-                renderer.DrawText("Ball1: pos=(" + std::to_string(coll.b1.x) + "," + std::to_string(coll.b1.y) + ")  vx=" + std::to_string(coll.b1.vx), 30, y); y += 22;
-                renderer.DrawText("Ball2: pos=(" + std::to_string(coll.b2.x) + "," + std::to_string(coll.b2.y) + ")  vx=" + std::to_string(coll.b2.vx), 30, y); y += 22;
 
-                // draw scene2 UI (8 buttons)
-                drawBtns2();
-            }
+// ========================================================
+//                     工具函数
+// ========================================================
 
-            // draw preview area
-            int previewX = 30;
-            int previewY = 380;
-            int previewW = 800;
-            int previewH = 300;
-            setlinecolor(BLACK);
-            rectangle(previewX - 2, previewY - 2, previewX + previewW + 2, previewY + previewH + 2);
-
-            if (model == ModelType::SLOPE) {
-                RampData rp;
-                rp.x1 = slope.top_x; rp.y1 = slope.top_y;
-                rp.x2 = slope.bottom_x; rp.y2 = slope.bottom_y;
-                rp.mu = slope.mu;
-                renderer.DrawRamp(rp);
-                BallData b = slope.ball;
-                renderer.DrawBall(b);
-            }
-            else {
-                renderer.DrawBall(coll.b1);
-                renderer.DrawBall(coll.b2);
-            }
+// 重置所有“选择模型”的按钮状态
+void resetModelSelection()
+{
+    resetButtonStates();
+}
 
             // keyboard handling (menu)
             if (_kbhit()) {
