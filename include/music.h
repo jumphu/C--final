@@ -10,7 +10,7 @@ private:
     
 public:
     // 构造函数 - 设置按钮位置和大小
-    MusicPlayer(int x = 320, int y = 80, int r = 60);
+    MusicPlayer(int x = 50, int y = 550, int r = 30);
     
     // 绘制按钮（在主项目的绘制循环中调用）
     void Draw();
