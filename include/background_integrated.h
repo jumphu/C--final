@@ -1,6 +1,6 @@
 #pragma once
-// »ùÓÚÄãÔ­Ê¼ background1.cpp£¬µ«ÒÆ³ıÁË BeginBatchDraw()/EndBatchDraw()
-// ÒÔ±ãÓë Renderer µÄÅúÁ¿»æÖÆĞ­×÷¡£
+// åŸºäºä½ åŸå§‹ background1.cppï¼Œä½†ç§»é™¤äº† BeginBatchDraw()/EndBatchDraw()
+// ä»¥ä¾¿ä¸ Renderer çš„æ‰¹é‡ç»˜åˆ¶åä½œã€‚
 
 #ifndef DIGITAL_RAIN_BACKGROUND_INTEGRATED_H
 #define DIGITAL_RAIN_BACKGROUND_INTEGRATED_H
@@ -9,9 +9,9 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define SCREEN_WIDTH_INT 1366
-#define SCREEN_HEIGHT_INT 768
-#define DEF_RAIN_NUM_INT 100
+#define SCREEN_WIDTH_INT 800
+#define SCREEN_HEIGHT_INT 600
+#define DEF_RAIN_NUM_INT 53
 
 class DigitalRainBackgroundIntegrated {
 private:
@@ -22,8 +22,9 @@ private:
     void initRain();
 public:
     DigitalRainBackgroundIntegrated();
-    // ÔÚ renderer.BeginFrame() Óë EndFrame() Ö®¼ä±»µ÷ÓÃ
+    // åœ¨ renderer.BeginFrame() ä¸ EndFrame() ä¹‹é—´è¢«è°ƒç”¨
     void UpdateAndDraw();
 };
 
 #endif
+
