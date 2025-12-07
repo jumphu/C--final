@@ -3,17 +3,31 @@
 #include <windows.h>
 #include <mmsystem.h>
 #include <cmath>
+#include <iostream>
 #pragma comment(lib, "winmm.lib")
 #include <stdio.h>
 
-const char* musicFile = "“Ù¿÷¬∑æ∂.mp3";
+// Use a safe, English filename. 
+// User must place "bgm.mp3" in the same directory as the executable.
+const char* musicFile = "bgm.mp3";
 
 void playMusic() {
     mciSendString("close mymusic", NULL, 0, NULL);
     char cmd[256];
     sprintf(cmd, "open \"%s\" alias mymusic", musicFile);
-    if (mciSendString(cmd, NULL, 0, NULL) == 0) {
-        mciSendString("play mymusic", NULL, 0, NULL);
+    
+    int err = mciSendString(cmd, NULL, 0, NULL);
+    if (err == 0) {
+        mciSendString("play mymusic repeat", NULL, 0, NULL); // Added 'repeat' for looping
+    } else {
+        // Try absolute path or report error (console only)
+        std::cerr << "Error opening music file: " << musicFile << " (MCI Error: " << err << ")" << std::endl;
+        
+        // Fallback: Try looking in ../bgm.mp3 in case we are in bin/
+        sprintf(cmd, "open \"../%s\" alias mymusic", musicFile);
+        if (mciSendString(cmd, NULL, 0, NULL) == 0) {
+             mciSendString("play mymusic repeat", NULL, 0, NULL);
+        }
     }
 }
 
@@ -89,7 +103,7 @@ bool MusicPlayer::HandleMouseInput(int mouseX, int mouseY, int messageType) {
         return isMouseInButton;
     case WM_LBUTTONDOWN:
         if (isMouseInButton) {
-            if (isPlaying) { stopMusic(); isPlaying = false; }
+            if (isPlaying) { stopMusic(); isPlaying = false; } 
             else { playMusic(); isPlaying = true; }
             return true;
         }
