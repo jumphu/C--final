@@ -98,8 +98,8 @@ int Renderer::WorldToScreenX(double wx) const {
 }
 
 int Renderer::WorldToScreenY(double wy) const {
-    // world origin at (0,0) center; screen origin at top-left
-    return static_cast<int>(height / 2.0 - wy * scale + 0.5);
+    // world origin at (width/2, height-200); Y axis up
+    return static_cast<int>((height - 200.0) - wy * scale + 0.5);
 }
 
 double Renderer::ScreenToWorldX(int sx) const {
@@ -107,7 +107,7 @@ double Renderer::ScreenToWorldX(int sx) const {
 }
 
 double Renderer::ScreenToWorldY(int sy) const {
-    return (height / 2.0 - sy) / scale;
+    return ((height - 200.0) - sy) / scale;
 }
 
 void Renderer::DrawRotatedRect(double cx, double cy, double w, double h, double angle, COLORREF color) {
