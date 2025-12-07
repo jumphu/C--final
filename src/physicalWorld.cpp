@@ -300,6 +300,28 @@ void PhysicalWorld::update(std::vector<Shape*>& shapeList, double deltaTime, con
 	
 	// ========== 第四阶段：碰撞检测和处理 ==========
 	handleAllCollisions(shapeList);
+    
+    // 处理与静态物体的碰撞
+    for (auto& dyn : shapeList) {
+        for (auto& stat : staticShapeList) {
+            // 碰撞检测
+            if (dyn->check_collision(*stat)) {
+                // 解决碰撞 (静态物体质量无穷大，resolveCollision应该能处理)
+                // 注意：resolveCollision 假设两个物体都是 DynamicShape? 
+                // 不，它使用 Shape&，并检查 mass。
+                // 但是如果 stat 是 Wall，resolveCollision 可能不够精确（使用一维弹性碰撞）。
+                // Wall 有专门的 resolveCollisionWithWall。
+                
+                const Wall* wall = dynamic_cast<const Wall*>(stat);
+                if (wall) {
+                    resolveCollisionWithWall(*dyn, *wall);
+                } else {
+                    // 对于其他静态物体（如 Slope），使用通用解决
+                    resolveCollision(*dyn, *stat);
+                }
+            }
+        }
+    }
 }
 
 /*=========================================================================================================

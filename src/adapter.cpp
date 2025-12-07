@@ -263,24 +263,18 @@ void PhysicsVisualAdapter::handleButtonClicks() {
     }
     
     // Scene buttons
-    if (getSphereCreationButtonState()) {
-        switchScene(SCENE_SPHERE_CREATION);
-        // Reset state handled by helper in spacebottum.cpp if we called checkSceneModelButtonStates
-        // But here we access flags directly via getter. 
-        // We need to manually reset them or call the check function.
-        // spacebottum.cpp's checkSceneModelButtonStates does logic we can't easily hook into without calling it.
-        // But we are reading flags directly. So we should reset them.
-        // wait, sphere_creationClicked is extern bool.
+    if (getSphereCreationButtonState()) { // Top button (Labeled "Slope Scene")
+        switchScene(SCENE_SINGLE_OBJECT); 
         extern bool sphere_creationClicked;
         sphere_creationClicked = false;
     }
-    if (getTwoStarsButtonState()) {
+    if (getTwoStarsButtonState()) { // Middle button (Labeled "Ball Collision")
         switchScene(SCENE_TWO_OBJECTS);
         extern bool two_starsClicked;
         two_starsClicked = false;
     }
-    if (getSolarSysButtonState()) {
-        switchScene(SCENE_SOLAR_SYS);
+    if (getSolarSysButtonState()) { // Bottom button (Labeled "Stacking Demo")
+        switchScene(SCENE_SPHERE_CREATION);
         extern bool solar_sysClicked;
         solar_sysClicked = false;
     }
@@ -413,17 +407,17 @@ void PhysicsVisualAdapter::initializeScene(SceneMode scene) {
     
     switch (scene) {
         case SCENE_SINGLE_OBJECT:
-            // Slope and ball
-            createPhysicsObject(OBJ_SLOPE, 0, -5, 20.0, 0.3, 1000.0, RGB(100, 100, 100), false);
-            createPhysicsObject(OBJ_CIRCLE, -8, 5, 1.0, 0.0, 1.0, RGB(255, 0, 0), true);
+            // Scene 1: Slope
+            physicsWorld->setInclineAngle(30.0);
+            createPhysicsObject(OBJ_CIRCLE, 0, 10, 1.0, 0.0, 1.0, RGB(255, 0, 0), true);
             break;
             
         case SCENE_TWO_OBJECTS:
-            // Two balls colliding
+            // Scene 2: Two balls colliding
+            physicsWorld->setInclineAngle(0.0);
             {
-                int id1 = createPhysicsObject(OBJ_CIRCLE, -10, 5, 1.0, 0.0, 1.0, RGB(255, 0, 0), true);
-                int id2 = createPhysicsObject(OBJ_CIRCLE, 10, 5, 1.5, 0.0, 2.0, RGB(0, 0, 255), true);
-                // Add initial velocity manually if needed
+                int id1 = createPhysicsObject(OBJ_CIRCLE, -8, 5, 1.0, 0.0, 1.0, RGB(255, 0, 0), true);
+                int id2 = createPhysicsObject(OBJ_CIRCLE, 8, 5, 1.0, 0.0, 1.0, RGB(0, 0, 255), true);
                 Shape* s1 = objectConnections[id1].physicsObject;
                 if(s1) s1->setVelocity(5, 0);
                 Shape* s2 = objectConnections[id2].physicsObject;
@@ -432,22 +426,21 @@ void PhysicsVisualAdapter::initializeScene(SceneMode scene) {
             break;
             
         case SCENE_SPHERE_CREATION:
-            // Multiple balls
-            for (int i = 0; i < 5; i++) {
-                createPhysicsObject(OBJ_CIRCLE, -10 + i * 5, 10 + i*2, 1.0, 0.0, 1.0, 
-                                   RGB(rand() % 255, rand() % 255, rand() % 255), true);
-            }
+            // Scene 3: Stacking (Block on Block)
+            physicsWorld->setInclineAngle(0.0);
+            createPhysicsObject(OBJ_AABB, 0, 2, 4.0, 2.0, 10.0, RGB(0, 255, 0), true); // Base
+            createPhysicsObject(OBJ_AABB, 0, 6, 2.0, 2.0, 5.0, RGB(0, 0, 255), true);  // Middle
+            createPhysicsObject(OBJ_AABB, 0, 10, 1.0, 1.0, 1.0, RGB(255, 0, 0), true); // Top
             break;
             
         case SCENE_SOLAR_SYS:
-             // Solar system demo
-             // Sun
-             createPhysicsObject(OBJ_CIRCLE, 0, 0, 3.0, 0.0, 10000.0, RGB(255, 200, 0), false); // Static sun? Or super heavy dynamic?
-             // Earth-like
+             // Scene 4: Block vs Wall
+             physicsWorld->setInclineAngle(0.0);
+             createPhysicsObject(OBJ_WALL, 10, 5, 2.0, 10.0, 0.0, RGB(100, 100, 100), false); // Wall
              {
-                 int id = createPhysicsObject(OBJ_CIRCLE, 15, 0, 1.0, 0.0, 10.0, RGB(0, 100, 255), true);
+                 int id = createPhysicsObject(OBJ_AABB, -5, 5, 2.0, 2.0, 2.0, RGB(255, 165, 0), true);
                  Shape* s = objectConnections[id].physicsObject;
-                 if(s) s->setVelocity(0, 25); // Orbit velocity
+                 if(s) s->setVelocity(8, 0);
              }
              break;
 

@@ -65,9 +65,9 @@ void drawSceneModelButtons(int btnX, int sphere_creationBtnY, int two_starsBtnY,
     settextstyle(18, 0, "Consolas");
     
     // Centering text manually approx
-    outtextxy(btnX + 20, sphere_creationBtnY + 20, "Sphere Creation");
-    outtextxy(btnX + 40, two_starsBtnY + 20, "Two Stars");
-    outtextxy(btnX + 30, solar_sysBtnY + 20, "Solar System");
+    outtextxy(btnX + (btnW-100)/2, sphere_creationBtnY + 20, "Slope Scene");
+    outtextxy(btnX + (btnW-140)/2, two_starsBtnY + 20, "Ball Collision");
+    outtextxy(btnX + (btnW-120)/2, solar_sysBtnY + 20, "Stacking Demo");
 }
 
 // Input handling
