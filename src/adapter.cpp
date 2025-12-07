@@ -408,8 +408,14 @@ void PhysicsVisualAdapter::initializeScene(SceneMode scene) {
     switch (scene) {
         case SCENE_SINGLE_OBJECT:
             // Scene 1: Slope
-            physicsWorld->setInclineAngle(30.0);
-            createPhysicsObject(OBJ_CIRCLE, 0, 10, 1.0, 0.0, 1.0, RGB(255, 0, 0), true);
+            physicsWorld->setInclineAngle(0.0); // Use normal gravity
+            // Create a static slope: x=0, y=-2, length=20, angle=0.26 rad (~15 deg)
+            createPhysicsObject(OBJ_SLOPE, 0, -2, 20.0, 0.26, 1000.0, RGB(100, 100, 100), false);
+            // Place ball at the top-left of the slope
+            // Slope center is (0, -2). Length 20. Top-left approx x = -10 * cos(0.26) ≈ -9.6
+            // y = -2 - 10 * sin(0.26) ≈ -4.5? No, slope goes up or down?
+            // Let's try x=-8, y=5 to drop it onto the slope
+            createPhysicsObject(OBJ_CIRCLE, -8, 5, 1.0, 0.0, 1.0, RGB(255, 0, 0), true);
             break;
             
         case SCENE_TWO_OBJECTS:
