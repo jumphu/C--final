@@ -454,9 +454,10 @@ void PhysicsVisualAdapter::initializeScene(SceneMode scene) {
              // Visual: Left end lower, Right end higher.
              createPhysicsObject(OBJ_SLOPE, 0, 2, 16.0, 0.26, 1000.0, RGB(100, 100, 100), false);
              
-             // Ball at Top-Right
-             // Raise to y=5.5 to ensure it sits clearly above the visual thickness of the ramp
-             createPhysicsObject(OBJ_CIRCLE, 7.5, 5.5, 1.0, 0.0, 1.0, RGB(0, 0, 255), true);
+             // Ball at Top-Right (Precise Tangent Position)
+             // Slope P(7.5, 3.995). Normal N(-0.257, 0.966).
+             // Center = P + R*N = (7.243, 4.961)
+             createPhysicsObject(OBJ_CIRCLE, 7.24, 4.96, 1.0, 0.0, 1.0, RGB(0, 0, 255), true);
              break;
 
         default:

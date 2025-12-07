@@ -637,12 +637,38 @@ void PhysicalWorld::resolveCollision(Shape& shape1, Shape& shape2) {
         // distance = dot(CP, n)
         distance = cpx * nx + cpy * ny;
         
-        // 如果在背面，反转法向量? 
-        // 假设球总是在上方，distance应该是正的
-        if (distance < 0) {
-            nx = -nx;
-            ny = -ny;
-            distance = -distance;
+        double radius = 0.0;
+        const Circle* c1 = dynamic_cast<const Circle*>(&shape1);
+        if (c1) radius = c1->getRadius();
+        
+        // 距离修正（球心到表面）
+        // 如果distance < radius，说明穿透
+        if (distance < radius) {
+             // 法向速度
+             double v1n = v1x * nx + v1y * ny;
+             
+             // 只有当物体朝向斜坡运动时才处理
+             if (v1n < 0) {
+                 // 恢复系数
+                 double r; shape1.getRestitution(r);
+                 
+                 // 静止接触阈值 (Resting Contact)
+                 if (v1n > -1.0) {
+                     r = 0.0;
+                 }
+                 
+                 double v1n_new = -v1n * r;
+                 double dv = v1n_new - v1n;
+                 
+                 shape1.setVelocity(v1x + dv * nx, v1y + dv * ny);
+             }
+             
+             // 强制位置修正 (直接推出去)
+             double overlap = radius - distance;
+             if (overlap > 0) {
+                 shape1.setCentre(x1 + overlap * nx, y1 + overlap * ny);
+             }
+             return; // 已处理
         }
     } else {
         // 默认：质心连线
