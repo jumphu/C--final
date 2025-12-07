@@ -47,10 +47,10 @@ void drawSceneModelButtons(int btnX, int sphere_creationBtnY, int two_starsBtnY,
         outtextxy(btnX + (btnW-tw)/2, y + (btnH-th)/2, text);
     };
 
-    drawBtn(sphere_creationBtnY, sphere_creationHovered, "Slope Scene");
-    drawBtn(two_starsBtnY, two_starsHovered, "Ball Collision");
-    drawBtn(solar_sysBtnY, solar_sysHovered, "Stacking Demo");
-    drawBtn(block_slopeBtnY, block_slopeHovered, "Block Slope");
+    outtextxy(btnX + (btnW-100)/2, sphere_creationBtnY + 20, "Slope Right");
+    outtextxy(btnX + (btnW-140)/2, two_starsBtnY + 20, "Ball Collision");
+    outtextxy(btnX + (btnW-120)/2, solar_sysBtnY + 20, "Stacking Demo");
+    outtextxy(btnX + (btnW-140)/2, block_slopeBtnY + 20, "Slope Left");
 }
 
 // Input handling
@@ -85,7 +85,7 @@ void initSceneModelButtons(int& btnX, int& sphere_creationBtnY, int& two_starsBt
     btnW = 200;
     btnH = 50; // Reduce height slightly to fit 4 buttons
     
-    int startY = 550; // Move up slightly
+    int startY = 450; // Move up to fit 4th button (ends at 450 + 3*(70) + 50 = 710 < 800)
     sphere_creationBtnY = startY;
     two_starsBtnY = startY + btnH + margin;
     solar_sysBtnY = startY + 2 * (btnH + margin);
