@@ -3,18 +3,25 @@ project(ProjectC)
 
 set(CMAKE_CXX_STANDARD 17)
 
-# 你的 include 目录
-include_directories("C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Auxiliary/VS/include")
+# Include Directories
+include_directories("include")
+include_directories("include/easyx") 
 
-# 你的 lib 目录（必须指向 easyxa.lib 所在目录）
-link_directories("C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Auxiliary/VS/lib/x64")
+# Link Directories
+link_directories("lib") 
 
-# 源代码
+# Source Files
+file(GLOB SOURCES 
+    "src/*.cpp"
+)
+
+# Executable
 add_executable(ProjectC
-    src/main.cpp
- "src/shapes.h")
+    ${SOURCES}
+)
 
-# 链接你真正拥有的库
+# Link Libraries
 target_link_libraries(ProjectC
-    EasyXa.lib        # 你确认存在
+    EasyXa.lib
+    winmm.lib
 )
