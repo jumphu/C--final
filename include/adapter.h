@@ -39,12 +39,12 @@
 
 // 场景模式枚举
 enum SceneMode {
-    SCENE_SINGLE_OBJECT,     // 单物体场景（斜坡上的球）
-    SCENE_TWO_OBJECTS,       // 双物体场景（碰撞演示）
-    SCENE_SPHERE_CREATION,   // 球体生成场景（多球体）
-    SCENE_TWO_STARS,         // 双星系统场景
-    SCENE_SOLAR_SYS,         // 太阳系场景
-    SCENE_PENDULUM,          // 钟摆场景（待实现）
+    SCENE_SINGLE_OBJECT,     // 单物体场景 (Slope)
+    SCENE_TWO_OBJECTS,       // 双物体场景 (Collision)
+    SCENE_SPHERE_CREATION,   // 球体生成 (Stacking)
+    SCENE_SOLAR_SYS,         // 太阳系 (Block Slope)
+    SCENE_BLOCK_ON_BOARD,    // 板块模型 (Block on Board)
+    SCENE_PENDULUM,          // 钟摆
     SCENE_NONE               // 无场景
 };
 
@@ -133,20 +133,11 @@ private:
     double lastUpdateTime;       // 上一次更新时间
     double accumulatedTime;      // 累积时间（用于固定时间步长）
     
-    // ==================== UI按钮位置管理 ====================
-    // 说明：管理5个独立UI系统的按钮位置信息
-    struct ButtonPositions {
-        // 控制按钮（threebottums.cpp）：开始/暂停/停止
-        int startBtnX, pauseBtnX, stopBtnX, btnY, btnW, btnH;
-        
-        // 场景选择按钮1（choose.cpp）：Model 1/2/3
-        int chooseBtnX, model1BtnY, model2BtnY, model3BtnY, chooseBtnW, chooseBtnH;
-        
-        // 场景选择按钮2（spacebottum.cpp）：行星体系场景
-        int spaceBtnX, sphereCreationBtnY, twoStarsBtnY, solarSysBtnY, spaceBtnW, spaceBtnH;
-    };
-    
-    ButtonPositions buttonPos;   // 按钮位置信息
+    // Button Layout Cache
+    struct {
+        int startX, pauseX, stopX, btnY, btnW, btnH;
+        int sceneBtnX, s1Y, s2Y, s3Y, s4Y, s5Y, sW, sH;
+    } btnLayout;
     
     // ==================== 内部辅助方法 ====================
     

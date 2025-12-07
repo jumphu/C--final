@@ -95,21 +95,24 @@ extern bool sphere_creationClicked;
 extern bool two_starsClicked;
 extern bool solar_sysClicked;
 extern bool block_slopeClicked;
+extern bool block_on_boardClicked;
 
 extern bool sphere_creationHovered;
 extern bool two_starsHovered;
 extern bool solar_sysHovered;
 extern bool block_slopeHovered;
+extern bool block_on_boardHovered;
 
 bool getSphereCreationButtonState();
 bool getTwoStarsButtonState();
 bool getSolarSysButtonState();
 bool getBlockSlopeButtonState();
+bool getBlockOnBoardButtonState();
 
-void drawSceneModelButtons(int btnX, int sphere_creationBtnY, int two_starsBtnY, int solar_sysBtnY, int block_slopeBtnY, int btnW, int btnH);
-void handleSceneModelMouseInput(int btnX, int sphere_creationBtnY, int two_starsBtnY, int solar_sysBtnY, int block_slopeBtnY, int btnW, int btnH);
+void drawSceneModelButtons(int btnX, int sphere_creationBtnY, int two_starsBtnY, int solar_sysBtnY, int block_slopeBtnY, int block_on_boardBtnY, int btnW, int btnH);
+void handleSceneModelMouseInput(int btnX, int sphere_creationBtnY, int two_starsBtnY, int solar_sysBtnY, int block_slopeBtnY, int block_on_boardBtnY, int btnW, int btnH);
 void checkSceneModelButtonStates();
-void initSceneModelButtons(int& btnX, int& sphere_creationBtnY, int& two_starsBtnY, int& solar_sysBtnY, int& block_slopeBtnY, int& btnW, int& btnH, int margin = 20);
+void initSceneModelButtons(int& btnX, int& sphere_creationBtnY, int& two_starsBtnY, int& solar_sysBtnY, int& block_slopeBtnY, int& block_on_boardBtnY, int& btnW, int& btnH, int margin = 20);
 
 #endif
 
