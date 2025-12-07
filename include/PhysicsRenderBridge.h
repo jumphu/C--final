@@ -82,6 +82,10 @@ public:
 
     virtual void createBall(double x, double y, double radius, double mass, const char* color) = 0;
     virtual void createBlock(double x, double y, double width, double height, double mass, const char* color) = 0;
+    virtual void createWall(double x, double y, double width, double height, double friction) = 0;
+    
+    virtual void clearWorld() = 0;
+    virtual void setInclineAngle(double angle) = 0;
 };
 
 struct UnifiedButtonStates {
@@ -123,6 +127,13 @@ public:
     void syncInputToPhysics(const std::vector<UserInput>& inputs);
     void updateButtonStates();
     void update(double dt);
+    
+    // Exposed control methods
+    void clearWorld();
+    void setInclineAngle(double angle);
+    void createWall(double x, double y, double width, double height, double friction = 0.5);
+    void createBall(double x, double y, double radius, double mass, const char* color);
+    void createBlock(double x, double y, double width, double height, double mass, const char* color);
     
     const std::unordered_map<std::string, RenderObject>& getRenderObjects() const { return render_objects_; }
     

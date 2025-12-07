@@ -67,6 +67,20 @@ public:
         std::string name = "Block_" + std::to_string(rand());
         world->placeDynamicShapeByType("AABB", name, x, y, mass, width, height);
     }
+
+    void createWall(double x, double y, double width, double height, double friction) override {
+        std::string name = "Wall_" + std::to_string(rand());
+        world->placeWall(name, x, y, width, height, friction);
+    }
+
+    void clearWorld() override {
+        world->clearAllShapes();
+        world->setInclineAngle(0.0); // Reset incline too
+    }
+
+    void setInclineAngle(double angle) override {
+        world->setInclineAngle(angle);
+    }
 };
 
 // ==================== Bridge Implementation ====================
@@ -155,6 +169,11 @@ RenderObject PhysicsRenderBridge::shapeToRenderObject(Shape* shape) const {
         obj.color = BLUE;
     } else if (type == "Wall") {
         obj.type = RenderObject::WALL;
+        Wall* w = dynamic_cast<Wall*>(shape);
+        obj.block.cx = x;
+        obj.block.cy = y;
+        obj.block.width = w ? w->getWidth() : 1.0;
+        obj.block.height = w ? w->getHeight() : 1.0;
         obj.color = WHITE;
     }
     
@@ -175,6 +194,26 @@ void PhysicsRenderBridge::syncInputToPhysics(const std::vector<UserInput>& input
             }
         }
     }
+}
+
+void PhysicsRenderBridge::clearWorld() {
+    physics_adapter_->clearWorld();
+}
+
+void PhysicsRenderBridge::setInclineAngle(double angle) {
+    physics_adapter_->setInclineAngle(angle);
+}
+
+void PhysicsRenderBridge::createWall(double x, double y, double width, double height, double friction) {
+    physics_adapter_->createWall(x, y, width, height, friction);
+}
+
+void PhysicsRenderBridge::createBall(double x, double y, double radius, double mass, const char* color) {
+    physics_adapter_->createBall(x, y, radius, mass, color);
+}
+
+void PhysicsRenderBridge::createBlock(double x, double y, double width, double height, double mass, const char* color) {
+    physics_adapter_->createBlock(x, y, width, height, mass, color);
 }
 
 void PhysicsRenderBridge::updateButtonStates() {
