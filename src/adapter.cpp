@@ -209,11 +209,23 @@ void PhysicsVisualAdapter::renderFrame() {
             case OBJ_CIRCLE: {
                 BallData ball = conn.getBallData();
                 renderer->DrawBall(ball);
+                
+                // Draw velocity text
+                char buf[32];
+                double speed = sqrt(ball.vx*ball.vx + ball.vy*ball.vy);
+                sprintf(buf, "v=%.2f", speed);
+                renderer->DrawText(buf, renderer->WorldToScreenX(ball.x) + 15, renderer->WorldToScreenY(ball.y) - 15, 14);
                 break;
             }
             case OBJ_AABB: {
                 BlockData block = conn.getBlockData();
                 renderer->DrawBlock(block);
+                
+                // Draw velocity text
+                char buf[32];
+                double speed = sqrt(block.vx*block.vx + block.vy*block.vy);
+                sprintf(buf, "v=%.2f", speed);
+                renderer->DrawText(buf, renderer->WorldToScreenX(block.cx) + 15, renderer->WorldToScreenY(block.cy) - 15, 14);
                 break;
             }
             case OBJ_SLOPE: {
