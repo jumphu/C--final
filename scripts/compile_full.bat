@@ -10,7 +10,7 @@ if %errorlevel% neq 0 (
 
 REM Set include and lib paths
 set INCLUDE=%INCLUDE%;%cd%\include;%cd%\include\easyx
-set LIB=%LIB%;%cd%\lib;"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\VS\lib\x64"
+set LIB=%LIB%;%cd%\lib
 
 REM Create bin directory
 if not exist bin mkdir bin
