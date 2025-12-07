@@ -29,6 +29,12 @@ int main() {
     bool isLeftMouseDown = false;
     
     while (running) {
+        // Check if window is closed (user clicked X)
+        if (!IsWindow(GetHWnd())) {
+            running = false;
+            break;
+        }
+
         DWORD currentTime = GetTickCount();
         float deltaTime = (currentTime - lastTime) / 1000.0f;
         lastTime = currentTime;
