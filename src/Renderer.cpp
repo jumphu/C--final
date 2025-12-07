@@ -94,20 +94,20 @@ void Renderer::DrawBlock(const BlockData& blk) {
 }
 
 int Renderer::WorldToScreenX(double wx) const {
-    return static_cast<int>(wx * scale + 0.5);
+    return static_cast<int>(width / 2.0 + wx * scale + 0.5);
 }
 
 int Renderer::WorldToScreenY(double wy) const {
-    // world origin at (0,0) bottom-left; screen origin at top-left
-    return static_cast<int>(height - wy * scale + 0.5);
+    // world origin at (0,0) center; screen origin at top-left
+    return static_cast<int>(height / 2.0 - wy * scale + 0.5);
 }
 
 double Renderer::ScreenToWorldX(int sx) const {
-    return sx / scale;
+    return (sx - width / 2.0) / scale;
 }
 
 double Renderer::ScreenToWorldY(int sy) const {
-    return (height - sy) / scale;
+    return (height / 2.0 - sy) / scale;
 }
 
 void Renderer::DrawRotatedRect(double cx, double cy, double w, double h, double angle, COLORREF color) {
