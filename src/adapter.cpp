@@ -418,14 +418,16 @@ void PhysicsVisualAdapter::initializeScene(SceneMode scene) {
     
     switch (scene) {
         case SCENE_SINGLE_OBJECT:
-            // Scene 1: Slope with Ball
+            // Scene 1: Slope (Left High, Right Low) -> Rolls Right
             physicsWorld->setInclineAngle(0.0); 
-            createPhysicsObject(OBJ_SLOPE, 0, 2, 16.0, 0.26, 1000.0, RGB(100, 100, 100), false);
-            createPhysicsObject(OBJ_CIRCLE, -6, 3.0, 1.0, 0.0, 1.0, RGB(255, 0, 0), true);
+            createPhysicsObject(OBJ_SLOPE, 0, 2, 16.0, -0.26, 1000.0, RGB(100, 100, 100), false);
+            // Ball at Top-Left
+            // Slope surface at x=-6 (angle -0.26): y = 2 + tan(-0.26)*(-6) = 2 + 1.6 = 3.6
+            createPhysicsObject(OBJ_CIRCLE, -6, 4.6, 1.0, 0.0, 1.0, RGB(255, 0, 0), true);
             break;
             
         case SCENE_TWO_OBJECTS:
-            // Scene 2: Two balls colliding
+            // Scene 2: Collision
             physicsWorld->setInclineAngle(0.0);
             {
                 int id1 = createPhysicsObject(OBJ_CIRCLE, -8, 5, 1.0, 0.0, 1.0, RGB(255, 0, 0), true);
@@ -438,24 +440,23 @@ void PhysicsVisualAdapter::initializeScene(SceneMode scene) {
             break;
             
         case SCENE_SPHERE_CREATION:
-            // Scene 3: Stacking (Block on Block)
+            // Scene 3: Stacking
             physicsWorld->setInclineAngle(0.0);
-            createPhysicsObject(OBJ_AABB, 0, 2, 4.0, 2.0, 10.0, RGB(0, 255, 0), true); // Base
-            createPhysicsObject(OBJ_AABB, 0, 6, 2.0, 2.0, 5.0, RGB(0, 0, 255), true);  // Middle
-            createPhysicsObject(OBJ_AABB, 0, 10, 1.0, 1.0, 1.0, RGB(255, 0, 0), true); // Top
+            createPhysicsObject(OBJ_AABB, 0, 2, 4.0, 2.0, 10.0, RGB(0, 255, 0), true);
+            createPhysicsObject(OBJ_AABB, 0, 6, 2.0, 2.0, 5.0, RGB(0, 0, 255), true);
+            createPhysicsObject(OBJ_AABB, 0, 10, 1.0, 1.0, 1.0, RGB(255, 0, 0), true);
             break;
             
         case SCENE_SOLAR_SYS:
-             // Scene 4: Block Slope
+             // Scene 4: Ball Slope (Left Low, Right High) -> Rolls Left
              physicsWorld->setInclineAngle(0.0);
-             // Slope: x=0, y=2, len=16, angle=-0.26 (approx -15 deg, down to right)
-             createPhysicsObject(OBJ_SLOPE, 0, 2, 16.0, -0.26, 1000.0, RGB(100, 100, 100), false);
+             // Slope: x=0, y=2, len=16, angle=0.26 (approx 15 deg)
+             // Visual: Left end lower, Right end higher.
+             createPhysicsObject(OBJ_SLOPE, 0, 2, 16.0, 0.26, 1000.0, RGB(100, 100, 100), false);
              
-             // Block: w=2, h=1. Position at x=-6 (top of slope).
-             // Slope surface at x=-6: y = 2 + tan(-0.26)*(-6) = 2 + (-0.266)*(-6) = 3.59.
-             // Block center y should be surface_y + h/2 = 3.59 + 0.5 = 4.09.
-             // We set y=4.2 to be safe just above it.
-             createPhysicsObject(OBJ_AABB, -6, 4.2, 2.0, 1.0, 1.0, RGB(0, 0, 255), true);
+             // Block: changed to Ball as per request.
+             // Ball radius 1.0. Center y = surface_y + radius = 3.59 + 1.0 = 4.59.
+             createPhysicsObject(OBJ_CIRCLE, -6, 4.6, 1.0, 0.0, 1.0, RGB(0, 0, 255), true);
              break;
 
         default:
