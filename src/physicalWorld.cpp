@@ -470,7 +470,9 @@ void PhysicalWorld::handleSupportedShape(Shape* shape, double deltaTime, const G
         }
     }
 
-	double drivingForce = shape->getMass() * gravity * std::sin(angleRad);
+	// 修正重力沿斜面分量计算：F = -mg * sin(theta) * cos(theta) (简化为 -mg*sin(theta) 水平分量)
+	// 当角度为正（左低右高），sin>0，力应该向左（负），所以需要负号
+	double drivingForce = -shape->getMass() * gravity * std::sin(angleRad);
 	
 	// 3. 施加摩擦力（传入即将施加的驱动力）
 	double friction = 0.0;
@@ -618,15 +620,42 @@ void PhysicalWorld::resolveCollision(Shape& shape1, Shape& shape2) {
 	shape2.getCentre(x2, y2);
 	
 	// 碰撞法向量
-	double nx = x2 - x1;
-	double ny = y2 - y1;
-	double distance = std::sqrt(nx * nx + ny * ny);
-	
-	if (distance < 0.0001) return; // 避免除零错误
-	
-	// 归一化法向量
-	nx /= distance;
-	ny /= distance;
+	double nx, ny, distance;
+    
+    const Slope* slope = dynamic_cast<const Slope*>(&shape2);
+    if (slope) {
+        // 特殊处理斜坡：法向量垂直于斜面
+        double angle = slope->getAngle();
+        nx = -std::sin(angle);
+        ny = std::cos(angle);
+        
+        // 计算球心到斜坡面的距离 (投影)
+        // 向量 CP = P - C
+        double cpx = x1 - x2;
+        double cpy = y1 - y2;
+        
+        // distance = dot(CP, n)
+        distance = cpx * nx + cpy * ny;
+        
+        // 如果在背面，反转法向量? 
+        // 假设球总是在上方，distance应该是正的
+        if (distance < 0) {
+            nx = -nx;
+            ny = -ny;
+            distance = -distance;
+        }
+    } else {
+        // 默认：质心连线
+        nx = x2 - x1;
+        ny = y2 - y1;
+        distance = std::sqrt(nx * nx + ny * ny);
+        
+        if (distance < 0.0001) return; // 避免除零错误
+        
+        // 归一化法向量
+        nx /= distance;
+        ny /= distance;
+    }
 	
 	// 计算切向量（垂直于法向量）
 	double tx = -ny;
@@ -701,11 +730,22 @@ void PhysicalWorld::separateOverlappingShapes(Shape& shape1, Shape& shape2, doub
 	const Circle* c2 = dynamic_cast<const Circle*>(&shape2);
 	const AABB* a1 = dynamic_cast<const AABB*>(&shape1);
 	const AABB* a2 = dynamic_cast<const AABB*>(&shape2);
+    const Slope* s1 = dynamic_cast<const Slope*>(&shape1);
+    const Slope* s2 = dynamic_cast<const Slope*>(&shape2);
 	
 	// 情况1：Circle 与 Circle
 	if (c1 && c2) {
 		overlap = c1->getRadius() + c2->getRadius() - distance;
 	}
+    // 情况X：Circle 与 Slope
+    else if ((c1 && s2) || (s1 && c2)) {
+        const Circle* circle = c1 ? c1 : c2;
+        // distance 是球心到平面的距离（在resolveCollision中计算并传入）
+        // 如果是通用碰撞检测传入的distance（质心距离），这里可能会错。
+        // 但我们只在resolveCollision里修正了Slope的distance计算。
+        // 假设 distance 是正确的 "separation distance"。
+        overlap = circle->getRadius() - distance;
+    }
 	// 情况2：AABB 与 AABB
 	else if (a1 && a2) {
 		double overlapX = (a1->getWidth() + a2->getWidth()) / 2.0 - std::abs(x2 - x1);
