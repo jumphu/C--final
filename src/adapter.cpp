@@ -446,12 +446,16 @@ void PhysicsVisualAdapter::initializeScene(SceneMode scene) {
             break;
             
         case SCENE_SOLAR_SYS:
-             // Scene 4: Block Slope (NEW)
+             // Scene 4: Block Slope
              physicsWorld->setInclineAngle(0.0);
-             // Slope: x=0, y=2, len=16, angle=0.26
-             createPhysicsObject(OBJ_SLOPE, 0, 2, 16.0, 0.26, 1000.0, RGB(100, 100, 100), false);
-             // Block: w=2, h=1
-             createPhysicsObject(OBJ_AABB, -6, 3.0, 2.0, 1.0, 1.0, RGB(0, 0, 255), true);
+             // Slope: x=0, y=2, len=16, angle=-0.26 (approx -15 deg, down to right)
+             createPhysicsObject(OBJ_SLOPE, 0, 2, 16.0, -0.26, 1000.0, RGB(100, 100, 100), false);
+             
+             // Block: w=2, h=1. Position at x=-6 (top of slope).
+             // Slope surface at x=-6: y = 2 + tan(-0.26)*(-6) = 2 + (-0.266)*(-6) = 3.59.
+             // Block center y should be surface_y + h/2 = 3.59 + 0.5 = 4.09.
+             // We set y=4.2 to be safe just above it.
+             createPhysicsObject(OBJ_AABB, -6, 4.2, 2.0, 1.0, 1.0, RGB(0, 0, 255), true);
              break;
 
         default:
