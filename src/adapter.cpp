@@ -505,19 +505,22 @@ void PhysicsVisualAdapter::initializeScene(SceneMode scene) {
              // 1. Ground (Invisible friction provider, y=0)
              physicsWorld->ground.setFriction(0.1); // ground friction mu2
              
-             // Long Board (M)
+             // 2. Long Board (M)
+             // mass=10.0 (heavier), width=15.0 (longer), height=1.0. Pos(0, 0.5). Color Gray.
              {
-                 int idM = createPhysicsObject(OBJ_AABB, 0, 0.5, 10.0, 1.0, 5.0, RGB(160, 160, 160), true);
+                 int idM = createPhysicsObject(OBJ_AABB, 0, 0.5, 15.0, 1.0, 10.0, RGB(160, 160, 160), true);
                  if(objectConnections[idM].physicsObject) 
-                     objectConnections[idM].physicsObject->setFraction(0.3); 
+                     objectConnections[idM].physicsObject->setFraction(0.3); // mu1
              }
              
-             // Small Block (m)
+             // 3. Small Block (m)
+             // mass=1.0, width=1.0, height=1.0. Pos(-6, 1.5). Color Red.
+             // Initial velocity v0 = 6.0 (slower).
              {
-                 int idm = createPhysicsObject(OBJ_AABB, -4, 1.5, 1.0, 1.0, 1.0, RGB(255, 0, 0), true);
+                 int idm = createPhysicsObject(OBJ_AABB, -6, 1.5, 1.0, 1.0, 1.0, RGB(255, 0, 0), true);
                  if(objectConnections[idm].physicsObject) {
-                     objectConnections[idm].physicsObject->setVelocity(10.0, 0.0);
-                     objectConnections[idm].physicsObject->setFraction(0.3); 
+                     objectConnections[idm].physicsObject->setVelocity(6.0, 0.0);
+                     objectConnections[idm].physicsObject->setFraction(0.3); // same mu1
                  }
              }
              break;
