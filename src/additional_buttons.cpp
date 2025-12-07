@@ -1,4 +1,5 @@
 #include "additional_buttons.h"
+
 #include <iostream>
 #include <cstring>
 #include <cstdlib>
@@ -76,6 +77,8 @@ void AdditionalButtons::drawButtons() {
 //处理来自鼠标的数据输入
 void AdditionalButtons::handleMouseInput() {
     ExMessage msg;  //定义一个ExMessage结构体变量用于存储鼠标数据
+    int processedMessages = 0;
+    const int MAX_MESSAGES = 10;
     //循环处理鼠标消息，直到没有数据
     while (peekmessage(&msg, EM_MOUSE) && processedMessages < MAX_MESSAGES) {
         //如果数据是移动鼠标，则执行下面的语句

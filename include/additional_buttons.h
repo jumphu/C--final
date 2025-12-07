@@ -37,7 +37,7 @@ public:
     //获取所选颜色
     const char* getColorChoice() const;
     //获取重力系数
-    float getGravityCoefficient() const;  Fri
+    float getGravityCoefficient() const;
     //获取摩擦力系数
     float getFrictionCoefficient() const;
     //获取速度值

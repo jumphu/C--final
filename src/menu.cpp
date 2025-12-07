@@ -1,3 +1,4 @@
+#define NOMINMAX
 #include "Renderer.h"
 #include <conio.h>      // _kbhit, _getch
 #include <string>

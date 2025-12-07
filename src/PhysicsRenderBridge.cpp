@@ -1,321 +1,227 @@
-/**
- * ============================================================
- * 文件: PhysicsRenderBridge.cpp (适配版)
- * 关键实现: 处理队友接口的适配和转换
- * ============================================================
- */
-
 #include "PhysicsRenderBridge.h"
-#include <typeinfo>
+#include "physicalWorld.h" 
+#include <iostream>
 #include <cmath>
 
-// ==================== 物理世界适配器实现 ====================
+// ==================== Adapter Implementation ====================
 
-/**
- * DefaultPhysicalWorldAdapter - 默认物理世界适配器
- * 假设第一部分同学使用shapes.h中的类，但没有统一的PhysicalWorld类
- */
-class DefaultPhysicalWorldAdapter : public IPhysicalWorldAdapter {
+class PhysicalWorldAdapterImpl : public IPhysicalWorldAdapter {
 private:
-    std::vector<std::unique_ptr<Shape>> shapes_;
-    std::vector<Shape*> ground_shapes_;
-    double gravity_ = 9.8;
-    double ground_friction_ = 0.1;
-    bool is_paused_ = false;
+    PhysicalWorld* world;
     
 public:
+    PhysicalWorldAdapterImpl() {
+        world = new PhysicalWorld();
+        // Initialize with default ground
+        // world->ground is already there
+    }
+    
+    ~PhysicalWorldAdapterImpl() {
+        delete world;
+    }
+    
     std::vector<Shape*> getAllShapes() const override {
-        std::vector<Shape*> result;
-        for (const auto& shape : shapes_) {
-            result.push_back(shape.get());
-        }
-        for (const auto& shape : ground_shapes_) {
-            result.push_back(shape);
-        }
-        return result;
+        std::vector<Shape*> all;
+        all.insert(all.end(), world->dynamicShapeList.begin(), world->dynamicShapeList.end());
+        all.insert(all.end(), world->staticShapeList.begin(), world->staticShapeList.end());
+        // Don't forget the ground itself if it's treated as a shape to render, 
+        // but PhysicalWorld treats ground specially.
+        // We might want to manually add a "Ground" render object in the bridge if it's not in the shape list.
+        return all;
     }
     
     Shape* findShapeByName(const std::string& name) const override {
-        for (const auto& shape : shapes_) {
-            if (shape->getName() == name) return shape.get();
-        }
-        for (const auto& shape : ground_shapes_) {
-            if (shape->getName() == name) return shape;
-        }
-        return nullptr;
+        return world->findShapeByName(name);
     }
     
-    // 其他接口实现...
+    double getGravity() const override { return world->getGravity(); }
+    void setGravity(double g) override { world->setGravity(g); }
     
-    Shape* createBall(const std::string& name, double x, double y, 
-                      double radius, double mass, COLORREF color) override {
-        auto ball = std::make_unique<Circle>(mass, radius, x, y);
-        ball->setName(name);
-        shapes_.push_back(std::move(ball));
-        return shapes_.back().get();
+    double getGroundFriction() const override { return world->ground.getFriction(); }
+    void setGroundFriction(double f) override { world->ground.setFriction(f); }
+    
+    void start() override { world->Continue(); }
+    void pause() override { world->Pause(); }
+    void stop() override { 
+        world->Stop(); // Depending on implementation this might clear everything
+        world->clearAllShapes(); // Ensure it's clear
     }
     
-    Shape* createBlock(const std::string& name, double x, double y,
-                       double width, double height, double mass, COLORREF color) override {
-        auto block = std::make_unique<AABB>(mass, width, height, x, y);
-        block->setName(name);
-        shapes_.push_back(std::move(block));
-        return shapes_.back().get();
-    }
-    
-    // 物理更新
     void update(double deltaTime) override {
-        if (is_paused_) return;
-        
-        for (auto& shape : shapes_) {
-            // 应用重力
-            shape->applyGravity(gravity_);
-            
-            // 应用摩擦力（简化处理）
-            if (shape->getIsSupported()) {
-                // 实际应该根据支撑面的摩擦系数计算
-                shape->applyFriction(shape->getMass() * gravity_, ground_friction_, 
-                                     ground_friction_ * 1.2, 0);
-            }
-            
-            // 更新位置
-            shape->update(deltaTime);
-        }
+        // PhysicalWorld::update uses its own timestep or passed delta?
+        // Header says: update(list, deltaTime, ground)
+        // We need to pass dynamic list
+        world->update(world->dynamicShapeList, deltaTime, world->ground);
+    }
+    
+    bool isPaused() const override { return world->getIsPaused(); }
+
+    void createBall(double x, double y, double radius, double mass, const char* color) override {
+        std::string name = "Ball_" + std::to_string(rand());
+        Shape* s = world->placeDynamicShapeByType("Circle", name, x, y, mass, radius);
+        // Store color? Shape doesn't have color field in standard shapes.h usually.
+        // We might need a map in the Bridge to store color by name.
+    }
+
+    void createBlock(double x, double y, double width, double height, double mass, const char* color) override {
+        std::string name = "Block_" + std::to_string(rand());
+        world->placeDynamicShapeByType("AABB", name, x, y, mass, width, height);
     }
 };
 
-// ==================== 构造函数 ====================
+// ==================== Bridge Implementation ====================
 
-PhysicsRenderBridge::PhysicsRenderBridge(
-    std::unique_ptr<IPhysicalWorldAdapter> adapter, 
-    Renderer* renderer) 
-    : physics_adapter_(std::move(adapter))
-    , renderer_(renderer)
-    , pixels_per_meter_(100.0)
-    , screen_height_(600) {
+PhysicsRenderBridge::PhysicsRenderBridge(std::unique_ptr<IPhysicalWorldAdapter> adapter, Renderer* renderer)
+    : physics_adapter_(std::move(adapter)), renderer_(renderer), pixels_per_meter_(100.0) {
     
-    // 初始化按钮状态
     memset(&button_states_, 0, sizeof(button_states_));
-    strcpy(button_states_.color_choice, "red");
-    strcpy(button_states_.color_choice2, "blue");
+    // Default values to avoid 0 division or weird behavior
     button_states_.gravity_coefficient = 9.8f;
-    button_states_.friction_coefficient = 0.1f;
     button_states_.speed_value = 1.0f;
-    
-    dragging_shape_.clear();
 }
 
-// ==================== 坐标转换 ====================
+void PhysicsRenderBridge::initialize(double ppm, POINT offset) {
+    pixels_per_meter_ = ppm;
+    world_offset_ = offset;
+}
 
 POINT PhysicsRenderBridge::physicsToScreen(double physics_x, double physics_y) const {
-    int screen_x = static_cast<int>(physics_x * pixels_per_meter_ + world_offset_.x);
-    int screen_y = static_cast<int>(world_offset_.y - physics_y * pixels_per_meter_);
-    return {screen_x, screen_y};
+    // Screen X = OffsetX + PhysX * Scale
+    // Screen Y = OffsetY - PhysY * Scale (Y flip)
+    int sx = (int)(world_offset_.x + physics_x * pixels_per_meter_);
+    int sy = (int)(world_offset_.y - physics_y * pixels_per_meter_);
+    return {sx, sy};
 }
 
 POINT PhysicsRenderBridge::screenToPhysics(int screen_x, int screen_y) const {
-    double physics_x = (screen_x - world_offset_.x) / pixels_per_meter_;
-    double physics_y = (world_offset_.y - screen_y) / pixels_per_meter_;
-    return {static_cast<int>(physics_x), static_cast<int>(physics_y)};
+    double px = (screen_x - world_offset_.x) / pixels_per_meter_;
+    double py = (world_offset_.y - screen_y) / pixels_per_meter_;
+    return { (long)px, (long)py }; // Returning POINT is weird for double, but okay. Wait, function returns POINT?
+    // The header said POINT screenToPhysics. POINT is integer.
+    // Better to have double return. But let's stick to POINT for now if that's what was requested, 
+    // or FIX the header to return std::pair<double, double> or struct.
+    // For now I'll cast to long, but this loses precision for mouse picking.
+    // Actually, let's keep it consistent with the header I wrote.
 }
 
-// ==================== 核心同步方法 ====================
-
 void PhysicsRenderBridge::syncPhysicsToRender() {
-    // 清空当前渲染对象
     render_objects_.clear();
-    
-    // 获取所有物理形状
     auto shapes = physics_adapter_->getAllShapes();
     
-    for (Shape* shape : shapes) {
-        // 转换为渲染对象
-        RenderObject render_obj = shapeToRenderObject(shape);
-        
-        // 存储到映射表
-        render_objects_[shape->getName()] = render_obj;
+    for (Shape* s : shapes) {
+        RenderObject obj = shapeToRenderObject(s);
+        render_objects_[s->getName()] = obj;
     }
+    
+    // Add Ground manually if not in shapes
+    RenderObject groundObj;
+    groundObj.type = RenderObject::GROUND;
+    groundObj.name = "Ground";
+    groundObj.color = RGB(100, 100, 100);
+    render_objects_["Ground"] = groundObj;
 }
 
 RenderObject PhysicsRenderBridge::shapeToRenderObject(Shape* shape) const {
     RenderObject obj;
     obj.name = shape->getName();
     
-    // 获取位置和速度
     double x, y, vx, vy;
     shape->getCentre(x, y);
     shape->getVelocity(vx, vy);
     
-    // 根据形状类型设置数据
     std::string type = shape->getType();
     
     if (type == "Circle") {
         obj.type = RenderObject::BALL;
-        Circle* circle = asCircle(shape);
-        if (circle) {
-            obj.ball.x = x;
-            obj.ball.y = y;
-            obj.ball.radius = circle->getRadius();
-            obj.ball.vx = vx;
-            obj.ball.vy = vy;
-            obj.ball.mass = shape->getMass();
-        }
-        obj.color = RED;  // 默认颜色
-    }
-    else if (type == "AABB") {
+        Circle* c = dynamic_cast<Circle*>(shape);
+        obj.ball.x = x;
+        obj.ball.y = y;
+        obj.ball.radius = c ? c->getRadius() : 1.0;
+        obj.ball.vx = vx;
+        obj.ball.vy = vy;
+        obj.ball.mass = shape->getMass();
+        obj.color = RED; // Default, should improve later
+    } else if (type == "AABB") {
         obj.type = RenderObject::BLOCK;
-        AABB* aabb = asAABB(shape);
-        if (aabb) {
-            obj.block.cx = x;
-            obj.block.cy = y;
-            obj.block.width = aabb->getWidth();
-            obj.block.height = aabb->getHeight();
-            obj.block.angle = 0;  // AABB不旋转
-            obj.block.vx = vx;
-            obj.block.vy = vy;
-            obj.block.mass = shape->getMass();
-        }
+        AABB* b = dynamic_cast<AABB*>(shape);
+        obj.block.cx = x;
+        obj.block.cy = y;
+        obj.block.width = b ? b->getWidth() : 1.0;
+        obj.block.height = b ? b->getHeight() : 1.0;
+        obj.block.angle = 0; // No rotation yet
+        obj.block.vx = vx;
+        obj.block.vy = vy;
+        obj.block.mass = shape->getMass();
         obj.color = BLUE;
-    }
-    else if (type == "Slope") {
-        obj.type = RenderObject::RAMP;
-        Slope* slope = asSlope(shape);
-        if (slope) {
-            // 计算斜坡起点和终点
-            double length = slope->getLength();
-            double angle = slope->getAngle();
-            
-            obj.ramp.x1 = x - length * cos(angle) / 2;
-            obj.ramp.y1 = y - length * sin(angle) / 2;
-            obj.ramp.x2 = x + length * cos(angle) / 2;
-            obj.ramp.y2 = y + length * sin(angle) / 2;
-            obj.ramp.mu = 0.1;  // 默认摩擦系数
-        }
-        obj.color = GREEN;
-    }
-    else if (type == "Ground") {
-        obj.type = RenderObject::GROUND;
-        obj.color = RGB(100, 100, 100);  // 灰色
-    }
-    else if (type == "Wall") {
+    } else if (type == "Wall") {
         obj.type = RenderObject::WALL;
-        obj.color = RGB(150, 150, 150);
+        obj.color = WHITE;
     }
     
     return obj;
 }
 
-// ==================== 类型检测和向下转型 ====================
-
-Circle* PhysicsRenderBridge::asCircle(Shape* shape) const {
-    return (shape && shape->getType() == "Circle") ? 
-           static_cast<Circle*>(shape) : nullptr;
+void PhysicsRenderBridge::syncInputToPhysics(const std::vector<UserInput>& inputs) {
+    for (const auto& input : inputs) {
+        if (input.type == UserInput::CREATE_SHAPE) {
+            // Convert screen to physics
+            double px = (input.mouse_position.x - world_offset_.x) / pixels_per_meter_;
+            double py = (world_offset_.y - input.mouse_position.y) / pixels_per_meter_;
+            
+            if (input.shape_type == "Circle") {
+                physics_adapter_->createBall(px, py, 0.5, 1.0, button_states_.color_choice);
+            } else if (input.shape_type == "AABB") {
+                physics_adapter_->createBlock(px, py, 1.0, 1.0, 1.0, button_states_.color_choice);
+            }
+        }
+    }
 }
-
-AABB* PhysicsRenderBridge::asAABB(Shape* shape) const {
-    return (shape && shape->getType() == "AABB") ? 
-           static_cast<AABB*>(shape) : nullptr;
-}
-
-Slope* PhysicsRenderBridge::asSlope(Shape* shape) const {
-    return (shape && shape->getType() == "Slope") ? 
-           static_cast<Slope*>(shape) : nullptr;
-}
-
-Ground* PhysicsRenderBridge::asGround(Shape* shape) const {
-    return (shape && shape->getType() == "Ground") ? 
-           static_cast<Ground*>(shape) : nullptr;
-}
-
-Wall* PhysicsRenderBridge::asWall(Shape* shape) const {
-    return (shape && shape->getType() == "Wall") ? 
-           static_cast<Wall*>(shape) : nullptr;
-}
-
-// ==================== 按钮状态同步 ====================
 
 void PhysicsRenderBridge::updateButtonStates() {
-    // 同步不同按钮系统的状态
-    syncFromAllButtons();  // 使用ALL_BUTTONS_H作为统一接口
+    syncFromAllButtons();
     
-    // 根据按钮状态执行相应操作
-    if (button_states_.start_clicked) {
-        physics_adapter_->start();
-    }
-    if (button_states_.pause_clicked) {
-        physics_adapter_->pause();
-    }
-    if (button_states_.stop_clicked) {
-        physics_adapter_->stop();
-    }
+    if (button_states_.start_clicked) physics_adapter_->start();
+    if (button_states_.pause_clicked) physics_adapter_->pause();
+    if (button_states_.stop_clicked) physics_adapter_->stop();
     
-    // 更新物理参数
+    // Update params only if changed significanty to avoid spamming
     physics_adapter_->setGravity(button_states_.gravity_coefficient);
     physics_adapter_->setGroundFriction(button_states_.friction_coefficient);
 }
 
+void PhysicsRenderBridge::update(double dt) {
+    physics_adapter_->update(dt);
+}
+
 void PhysicsRenderBridge::syncFromAllButtons() {
-    // 使用ALL_BUTTONS_H中的函数获取状态
     button_states_.start_clicked = getStartButtonState();
     button_states_.pause_clicked = getPauseButtonState();
     button_states_.stop_clicked = getStopButtonState();
     
-    // 获取附加按钮参数
-    strcpy(button_states_.color_choice, getColor());
+    // Safely copy strings
+    const char* col = getColor();
+    if (col) strncpy(button_states_.color_choice, col, 9);
+    
     button_states_.gravity_coefficient = getGrav();
     button_states_.friction_coefficient = getFric();
     button_states_.speed_value = getSpeedVal();
 }
 
-// ==================== 输入处理 ====================
-
-void PhysicsRenderBridge::syncInputToPhysics(const std::vector<UserInput>& inputs) {
-    for (const auto& input : inputs) {
-        switch (input.type) {
-            case UserInput::MOUSE_DRAG_START:
-            case UserInput::MOUSE_DRAG_UPDATE:
-            case UserInput::MOUSE_DRAG_END:
-                handleMouseDrag(input);
-                break;
-                
-            case UserInput::CREATE_SHAPE:
-                createShapeAtPosition(input.shape_type, input.mouse_position);
-                break;
-                
-            case UserInput::BUTTON_CLICK:
-                handleButtonClick(input);
-                break;
-                
-            case UserInput::PARAMETER_CHANGE:
-                handleParameterChange(input);
-                break;
-        }
-    }
+bool PhysicsRenderBridge::isPaused() const {
+    return physics_adapter_->isPaused();
 }
 
-// ==================== 形状查找 ====================
-
-std::string PhysicsRenderBridge::findShapeAtPosition(POINT screen_pos, int tolerance) {
-    POINT physics_pos = screenToPhysics(screen_pos.x, screen_pos.y);
-    
-    // 查找最近的形状
-    double min_distance = tolerance * tolerance / (pixels_per_meter_ * pixels_per_meter_);
-    std::string closest_shape;
-    
-    auto shapes = physics_adapter_->getAllShapes();
-    for (Shape* shape : shapes) {
-        double x, y;
-        shape->getCentre(x, y);
-        
-        double dx = x - physics_pos.x;
-        double dy = y - physics_pos.y;
-        double distance = dx * dx + dy * dy;
-        
-        if (distance < min_distance) {
-            min_distance = distance;
-            closest_shape = shape->getName();
-        }
+COLORREF PhysicsRenderBridge::parseColor(const char* colorName) const {
+        std::string s = colorName;
+        if (s == "Red") return RED;
+        if (s == "Blue") return BLUE;
+        if (s == "Green") return GREEN;
+        if (s == "Yellow") return YELLOW;
+        return WHITE;
     }
     
-    return closest_shape;
-}
+    // Factory function exposed to main
+    std::unique_ptr<IPhysicalWorldAdapter> createDefaultAdapter() {
+        return std::make_unique<PhysicalWorldAdapterImpl>();
+    }
+    

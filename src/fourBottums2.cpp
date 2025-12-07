@@ -97,7 +97,7 @@ void colorSelect2(int idx) {
     //本来是一个个单独绘制，重复了，后来优化成循环绘制
     for(int i=0;i<4;i++) {
         if(strcmp(colors[i],"Red")==0) {
-            setfillcolor(RED)
+            setfillcolor(RED);
         }
         else if(strcmp(colors[i],"Blue")==0) {
             setfillcolor(BLUE);
