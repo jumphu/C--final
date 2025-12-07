@@ -126,14 +126,24 @@ bool PhysicsVisualAdapter::initialize(int screenWidth, int screenHeight) {
     physicsWorld->setGravity(uiParams.gravity);
     physicsWorld->setTimeStep(1.0/60.0); 
     
-    // Initialize buttons
+    // Initialize buttons and store layout
     int startX, pauseX, stopX, btnY, btnW, btnH;
-    // Initialize Start/Pause/Stop buttons (from threebottums.cpp)
     initButtons(startX, pauseX, stopX, btnY, btnW, btnH);
+    btnLayout.startX = startX;
+    btnLayout.pauseX = pauseX;
+    btnLayout.stopX = stopX;
+    btnLayout.btnY = btnY;
+    btnLayout.btnW = btnW;
+    btnLayout.btnH = btnH;
     
-    // Initialize Scene Model buttons (from spacebottum.cpp)
     int sceneBtnX, s1Y, s2Y, s3Y, sW, sH;
     initSceneModelButtons(sceneBtnX, s1Y, s2Y, s3Y, sW, sH, 20); 
+    btnLayout.sceneBtnX = sceneBtnX;
+    btnLayout.s1Y = s1Y;
+    btnLayout.s2Y = s2Y;
+    btnLayout.s3Y = s3Y;
+    btnLayout.sW = sW;
+    btnLayout.sH = sH;
     
     return true;
 }
@@ -221,14 +231,9 @@ void PhysicsVisualAdapter::renderFrame() {
         }
     }
     
-    // Draw UI
-    int startX, pauseX, stopX, btnY, btnW, btnH;
-    initButtons(startX, pauseX, stopX, btnY, btnW, btnH); // Re-get positions
-    drawButtons(startX, pauseX, stopX, btnY, btnW, btnH);
-    
-    int sceneBtnX, s1Y, s2Y, s3Y, sW, sH;
-    initSceneModelButtons(sceneBtnX, s1Y, s2Y, s3Y, sW, sH, 20);
-    drawSceneModelButtons(sceneBtnX, s1Y, s2Y, s3Y, sW, sH);
+    // Draw UI using stored layout
+    drawButtons(btnLayout.startX, btnLayout.pauseX, btnLayout.stopX, btnLayout.btnY, btnLayout.btnW, btnLayout.btnH);
+    drawSceneModelButtons(btnLayout.sceneBtnX, btnLayout.s1Y, btnLayout.s2Y, btnLayout.s3Y, btnLayout.sW, btnLayout.sH);
 
     if (musicPlayer) {
         musicPlayer->Draw();
@@ -242,16 +247,76 @@ void PhysicsVisualAdapter::handleParameterChanges() {
 }
 
 void PhysicsVisualAdapter::handleButtonClicks() {
-    // Stub
+    // Check global button states
+    if (getStartButtonState()) {
+        startSimulation();
+        resetButtonStates();
+    }
+    if (getPauseButtonState()) {
+        pauseSimulation();
+        resetButtonStates();
+    }
+    if (getStopButtonState()) {
+        stopSimulation();
+        resetSimulation(); // Stop usually means reset in this context
+        resetButtonStates();
+    }
+    
+    // Scene buttons
+    if (getSphereCreationButtonState()) {
+        switchScene(SCENE_SPHERE_CREATION);
+        // Reset state handled by helper in spacebottum.cpp if we called checkSceneModelButtonStates
+        // But here we access flags directly via getter. 
+        // We need to manually reset them or call the check function.
+        // spacebottum.cpp's checkSceneModelButtonStates does logic we can't easily hook into without calling it.
+        // But we are reading flags directly. So we should reset them.
+        // wait, sphere_creationClicked is extern bool.
+        extern bool sphere_creationClicked;
+        sphere_creationClicked = false;
+    }
+    if (getTwoStarsButtonState()) {
+        switchScene(SCENE_TWO_OBJECTS);
+        extern bool two_starsClicked;
+        two_starsClicked = false;
+    }
+    if (getSolarSysButtonState()) {
+        switchScene(SCENE_SOLAR_SYS);
+        extern bool solar_sysClicked;
+        solar_sysClicked = false;
+    }
 }
 
 void PhysicsVisualAdapter::onMouseClick(int screenX, int screenY, bool leftButton) {
     if (!leftButton) return;
     
+    // Check Music Player
     if (musicPlayer && musicPlayer->HandleMouseInput(screenX, screenY, WM_LBUTTONDOWN)) {
         return;
     }
     
+    // Check UI Buttons - Start/Pause/Stop
+    if (isInButton(screenX, screenY, btnLayout.startX, btnLayout.btnY, btnLayout.btnW, btnLayout.btnH)) {
+        extern bool isStartClicked; isStartClicked = true; return;
+    }
+    if (isInButton(screenX, screenY, btnLayout.pauseX, btnLayout.btnY, btnLayout.btnW, btnLayout.btnH)) {
+        extern bool isPauseClicked; isPauseClicked = true; return;
+    }
+    if (isInButton(screenX, screenY, btnLayout.stopX, btnLayout.btnY, btnLayout.btnW, btnLayout.btnH)) {
+        extern bool isStopClicked; isStopClicked = true; return;
+    }
+    
+    // Check UI Buttons - Scenes
+    if (isInButton(screenX, screenY, btnLayout.sceneBtnX, btnLayout.s1Y, btnLayout.sW, btnLayout.sH)) {
+        extern bool sphere_creationClicked; sphere_creationClicked = true; return;
+    }
+    if (isInButton(screenX, screenY, btnLayout.sceneBtnX, btnLayout.s2Y, btnLayout.sW, btnLayout.sH)) {
+        extern bool two_starsClicked; two_starsClicked = true; return;
+    }
+    if (isInButton(screenX, screenY, btnLayout.sceneBtnX, btnLayout.s3Y, btnLayout.sW, btnLayout.sH)) {
+        extern bool solar_sysClicked; solar_sysClicked = true; return;
+    }
+    
+    // Check Objects
     int objectId = findObjectAtScreen(screenX, screenY);
     if (objectId != -1) {
         onMouseDragStart(screenX, screenY);
@@ -296,6 +361,17 @@ void PhysicsVisualAdapter::onMouseMove(int screenX, int screenY) {
     if (musicPlayer) {
         musicPlayer->HandleMouseInput(screenX, screenY, WM_MOUSEMOVE);
     }
+    
+    // Update Hover States
+    extern bool isStartHovered, isPauseHovered, isStopHovered;
+    isStartHovered = isInButton(screenX, screenY, btnLayout.startX, btnLayout.btnY, btnLayout.btnW, btnLayout.btnH);
+    isPauseHovered = isInButton(screenX, screenY, btnLayout.pauseX, btnLayout.btnY, btnLayout.btnW, btnLayout.btnH);
+    isStopHovered = isInButton(screenX, screenY, btnLayout.stopX, btnLayout.btnY, btnLayout.btnW, btnLayout.btnH);
+    
+    extern bool sphere_creationHovered, two_starsHovered, solar_sysHovered;
+    sphere_creationHovered = isInButton(screenX, screenY, btnLayout.sceneBtnX, btnLayout.s1Y, btnLayout.sW, btnLayout.sH);
+    two_starsHovered = isInButton(screenX, screenY, btnLayout.sceneBtnX, btnLayout.s2Y, btnLayout.sW, btnLayout.sH);
+    solar_sysHovered = isInButton(screenX, screenY, btnLayout.sceneBtnX, btnLayout.s3Y, btnLayout.sW, btnLayout.sH);
 }
 
 void PhysicsVisualAdapter::onKeyPress(char key) {
@@ -363,6 +439,18 @@ void PhysicsVisualAdapter::initializeScene(SceneMode scene) {
             }
             break;
             
+        case SCENE_SOLAR_SYS:
+             // Solar system demo
+             // Sun
+             createPhysicsObject(OBJ_CIRCLE, 0, 0, 3.0, 0.0, 10000.0, RGB(255, 200, 0), false); // Static sun? Or super heavy dynamic?
+             // Earth-like
+             {
+                 int id = createPhysicsObject(OBJ_CIRCLE, 15, 0, 1.0, 0.0, 10.0, RGB(0, 100, 255), true);
+                 Shape* s = objectConnections[id].physicsObject;
+                 if(s) s->setVelocity(0, 25); // Orbit velocity
+             }
+             break;
+
         default:
             break;
     }

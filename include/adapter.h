@@ -109,9 +109,13 @@ private:
         float gravity = 9.8f;
         float friction = 0.1f;
         float timeScale = 1.0f;
-        // 【待确认】决策点2：这些参数是全局还是针对单个物体？
-        // 当前假设为全局参数
     } uiParams;
+    
+    // Button Layout Cache
+    struct {
+        int startX, pauseX, stopX, btnY, btnW, btnH;
+        int sceneBtnX, s1Y, s2Y, s3Y, sW, sH;
+    } btnLayout;
     
     // 交互状态
     int draggedObjectId;      // 当前被拖拽的物体ID
