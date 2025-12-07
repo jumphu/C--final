@@ -454,9 +454,10 @@ void PhysicsVisualAdapter::initializeScene(SceneMode scene) {
              // Visual: Left end lower, Right end higher.
              createPhysicsObject(OBJ_SLOPE, 0, 2, 16.0, 0.26, 1000.0, RGB(100, 100, 100), false);
              
-             // Block: changed to Ball as per request.
-             // Ball radius 1.0. Center y = surface_y + radius = 3.59 + 1.0 = 4.59.
-             createPhysicsObject(OBJ_CIRCLE, -6, 4.6, 1.0, 0.0, 1.0, RGB(0, 0, 255), true);
+             // Ball at Top-Right (Highest Point)
+             // Slope surface at x=7.5: y = 2 + tan(0.26)*7.5 = 2 + 0.266*7.5 = 3.995
+             // Ball Center Y = 3.995 + 1.0 = 4.995. Set to 5.0.
+             createPhysicsObject(OBJ_CIRCLE, 7.5, 5.0, 1.0, 0.0, 1.0, RGB(0, 0, 255), true);
              break;
 
         default:
