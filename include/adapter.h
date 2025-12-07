@@ -114,7 +114,7 @@ private:
     // Button Layout Cache
     struct {
         int startX, pauseX, stopX, btnY, btnW, btnH;
-        int sceneBtnX, s1Y, s2Y, s3Y, sW, sH;
+        int sceneBtnX, s1Y, s2Y, s3Y, s4Y, sW, sH;
     } btnLayout;
     
     // 交互状态

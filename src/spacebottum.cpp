@@ -6,109 +6,90 @@ static bool isMouseInButton(int mx, int my, int x, int y, int w, int h) {
     return (mx >= x && mx <= x + w && my >= y && my <= y + h);
 }
 
-// Global variables definitions (declared extern in header)
+// Global variables definitions
 bool sphere_creationClicked = false;
 bool two_starsClicked = false;
 bool solar_sysClicked = false;
+bool block_slopeClicked = false;
 
 bool sphere_creationHovered = false;
 bool two_starsHovered = false;
 bool solar_sysHovered = false;
+bool block_slopeHovered = false;
 
 // Local reset function
 static void resetSceneButtons() {
     sphere_creationClicked = false;
     two_starsClicked = false;
     solar_sysClicked = false;
+    block_slopeClicked = false;
 }
 
 // Getter implementations
-bool getSphereCreationButtonState() { 
-    return sphere_creationClicked; 
-}
-
-bool getTwoStarsButtonState() { 
-    return two_starsClicked; 
-}
-
-bool getSolarSysButtonState() { 
-    return solar_sysClicked; 
-}
+bool getSphereCreationButtonState() { return sphere_creationClicked; }
+bool getTwoStarsButtonState() { return two_starsClicked; }
+bool getSolarSysButtonState() { return solar_sysClicked; }
+bool getBlockSlopeButtonState() { return block_slopeClicked; }
 
 // Draw function
-void drawSceneModelButtons(int btnX, int sphere_creationBtnY, int two_starsBtnY, int solar_sysBtnY, int btnW, int btnH) {
+void drawSceneModelButtons(int btnX, int sphere_creationBtnY, int two_starsBtnY, int solar_sysBtnY, int block_slopeBtnY, int btnW, int btnH) {
     
-    // Sphere Creation Button
-    if (sphere_creationHovered) 
-        setfillcolor(RGB(180, 200, 255));
-    else  
-        setfillcolor(RGB(220, 220, 220));
-    solidrectangle(btnX, sphere_creationBtnY, btnX + btnW, sphere_creationBtnY + btnH);
-    
-    // Two Stars Button
-    if (two_starsHovered)
-        setfillcolor(RGB(180, 200, 255));
-    else
-        setfillcolor(RGB(220, 220, 220));
-    solidrectangle(btnX, two_starsBtnY, btnX + btnW, two_starsBtnY + btnH);
-    
-    // Solar System Button
-    if (solar_sysHovered)
-        setfillcolor(RGB(180, 200, 255));
-    else
-        setfillcolor(RGB(220, 220, 220));
-    solidrectangle(btnX, solar_sysBtnY, btnX + btnW, solar_sysBtnY + btnH);
-    
-    // Text
-    settextcolor(RGB(255, 0, 0)); 
-    setbkmode(TRANSPARENT);  
-    settextstyle(18, 0, "Consolas");
-    
-    // Centering text manually approx
-    outtextxy(btnX + (btnW-100)/2, sphere_creationBtnY + 20, "Slope Scene");
-    outtextxy(btnX + (btnW-140)/2, two_starsBtnY + 20, "Ball Collision");
-    outtextxy(btnX + (btnW-120)/2, solar_sysBtnY + 20, "Stacking Demo");
+    // Helper lambda for drawing a single button
+    auto drawBtn = [&](int y, bool hovered, const char* text) {
+        if (hovered) setfillcolor(RGB(180, 200, 255));
+        else setfillcolor(RGB(220, 220, 220));
+        solidrectangle(btnX, y, btnX + btnW, y + btnH);
+        settextcolor(RGB(255, 0, 0)); 
+        setbkmode(TRANSPARENT);  
+        settextstyle(18, 0, "Consolas");
+        int tw = textwidth(text);
+        int th = textheight(text);
+        outtextxy(btnX + (btnW-tw)/2, y + (btnH-th)/2, text);
+    };
+
+    drawBtn(sphere_creationBtnY, sphere_creationHovered, "Slope Scene");
+    drawBtn(two_starsBtnY, two_starsHovered, "Ball Collision");
+    drawBtn(solar_sysBtnY, solar_sysHovered, "Stacking Demo");
+    drawBtn(block_slopeBtnY, block_slopeHovered, "Block Slope");
 }
 
 // Input handling
-void handleSceneModelMouseInput(int btnX, int sphere_creationBtnY, int two_starsBtnY, int solar_sysBtnY, int btnW, int btnH) {
+void handleSceneModelMouseInput(int btnX, int sphere_creationBtnY, int two_starsBtnY, int solar_sysBtnY, int block_slopeBtnY, int btnW, int btnH) {
     ExMessage msg;
     while (peekmessage(&msg, EM_MOUSE)) {  
         if (msg.message == WM_MOUSEMOVE) {
             sphere_creationHovered = isMouseInButton(msg.x, msg.y, btnX, sphere_creationBtnY, btnW, btnH);
             two_starsHovered = isMouseInButton(msg.x, msg.y, btnX, two_starsBtnY, btnW, btnH);
             solar_sysHovered = isMouseInButton(msg.x, msg.y, btnX, solar_sysBtnY, btnW, btnH);
+            block_slopeHovered = isMouseInButton(msg.x, msg.y, btnX, block_slopeBtnY, btnW, btnH);
         }
         
         if (msg.message == WM_LBUTTONDOWN) {
             if (sphere_creationHovered) sphere_creationClicked = true;
             if (two_starsHovered) two_starsClicked = true;
             if (solar_sysHovered) solar_sysClicked = true;
+            if (block_slopeHovered) block_slopeClicked = true;
         }
     }
 }
 
 // State checking
 void checkSceneModelButtonStates() {
-    if (getSphereCreationButtonState()) {
-        resetSceneButtons();
-    }
-    if (getTwoStarsButtonState()) {
-         resetSceneButtons();
-    }
-    if (getSolarSysButtonState()) {
+    if (getSphereCreationButtonState() || getTwoStarsButtonState() || getSolarSysButtonState() || getBlockSlopeButtonState()) {
         resetSceneButtons();
     }
 }
 
 // Init
-void initSceneModelButtons(int& btnX, int& sphere_creationBtnY, int& two_starsBtnY, int& solar_sysBtnY, int& btnW, int& btnH, int margin) {
+void initSceneModelButtons(int& btnX, int& sphere_creationBtnY, int& two_starsBtnY, int& solar_sysBtnY, int& block_slopeBtnY, int& btnW, int& btnH, int margin) {
     btnW = 200;
-    btnH = 60;
+    btnH = 50; // Reduce height slightly to fit 4 buttons
     
-    // Layout logic
-    sphere_creationBtnY = 600 - btnH - margin;
-    two_starsBtnY = 600;
-    solar_sysBtnY = 600 + btnH + margin;
-    btnX = 1000; // Fixed X for now
+    int startY = 550; // Move up slightly
+    sphere_creationBtnY = startY;
+    two_starsBtnY = startY + btnH + margin;
+    solar_sysBtnY = startY + 2 * (btnH + margin);
+    block_slopeBtnY = startY + 3 * (btnH + margin);
+    
+    btnX = 1000; 
 }

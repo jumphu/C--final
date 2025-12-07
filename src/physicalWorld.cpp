@@ -458,6 +458,18 @@ void PhysicalWorld::handleSupportedShape(Shape* shape, double deltaTime, const G
 	// 2.5. 计算沿斜面的重力分量（驱动力），但先不施加
 	const double PI = 3.14159265358979323846;
 	double angleRad = inclineAngle * PI / 180.0;
+    
+    // 如果支撑物是斜坡，叠加其角度
+    if (shape->getSupporter()) {
+        const Slope* slopeSup = dynamic_cast<const Slope*>(shape->getSupporter());
+        if (slopeSup) {
+            // 注意：Slope的angle通常是正值（如果斜坡左高右低？或者...）
+            // 假设Slope angle是与水平面的夹角。
+            // 如果物体在斜坡上，重力沿斜面的分量是 mg * sin(angle)
+            angleRad += slopeSup->getAngle();
+        }
+    }
+
 	double drivingForce = shape->getMass() * gravity * std::sin(angleRad);
 	
 	// 3. 施加摩擦力（传入即将施加的驱动力）

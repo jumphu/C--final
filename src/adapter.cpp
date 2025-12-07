@@ -136,12 +136,13 @@ bool PhysicsVisualAdapter::initialize(int screenWidth, int screenHeight) {
     btnLayout.btnW = btnW;
     btnLayout.btnH = btnH;
     
-    int sceneBtnX, s1Y, s2Y, s3Y, sW, sH;
-    initSceneModelButtons(sceneBtnX, s1Y, s2Y, s3Y, sW, sH, 20); 
+    int sceneBtnX, s1Y, s2Y, s3Y, s4Y, sW, sH; // Added s4Y for 4th button
+    initSceneModelButtons(sceneBtnX, s1Y, s2Y, s3Y, s4Y, sW, sH, 20); 
     btnLayout.sceneBtnX = sceneBtnX;
     btnLayout.s1Y = s1Y;
     btnLayout.s2Y = s2Y;
     btnLayout.s3Y = s3Y;
+    btnLayout.s4Y = s4Y;
     btnLayout.sW = sW;
     btnLayout.sH = sH;
     
@@ -233,7 +234,7 @@ void PhysicsVisualAdapter::renderFrame() {
     
     // Draw UI using stored layout
     drawButtons(btnLayout.startX, btnLayout.pauseX, btnLayout.stopX, btnLayout.btnY, btnLayout.btnW, btnLayout.btnH);
-    drawSceneModelButtons(btnLayout.sceneBtnX, btnLayout.s1Y, btnLayout.s2Y, btnLayout.s3Y, btnLayout.sW, btnLayout.sH);
+    drawSceneModelButtons(btnLayout.sceneBtnX, btnLayout.s1Y, btnLayout.s2Y, btnLayout.s3Y, btnLayout.s4Y, btnLayout.sW, btnLayout.sH);
 
     if (musicPlayer) {
         musicPlayer->Draw();
@@ -263,20 +264,25 @@ void PhysicsVisualAdapter::handleButtonClicks() {
     }
     
     // Scene buttons
-    if (getSphereCreationButtonState()) { // Top button (Labeled "Slope Scene")
+    if (getSphereCreationButtonState()) { // Top button: Slope
         switchScene(SCENE_SINGLE_OBJECT); 
         extern bool sphere_creationClicked;
         sphere_creationClicked = false;
     }
-    if (getTwoStarsButtonState()) { // Middle button (Labeled "Ball Collision")
+    if (getTwoStarsButtonState()) { // 2nd button: Collision
         switchScene(SCENE_TWO_OBJECTS);
         extern bool two_starsClicked;
         two_starsClicked = false;
     }
-    if (getSolarSysButtonState()) { // Bottom button (Labeled "Stacking Demo")
+    if (getSolarSysButtonState()) { // 3rd button: Stacking
         switchScene(SCENE_SPHERE_CREATION);
         extern bool solar_sysClicked;
         solar_sysClicked = false;
+    }
+    if (getBlockSlopeButtonState()) { // 4th button: Block on Slope (New Scene!)
+        switchScene(SCENE_SOLAR_SYS); // Reusing this enum for Block Slope
+        extern bool block_slopeClicked;
+        block_slopeClicked = false;
     }
 }
 
@@ -308,6 +314,9 @@ void PhysicsVisualAdapter::onMouseClick(int screenX, int screenY, bool leftButto
     }
     if (isInButton(screenX, screenY, btnLayout.sceneBtnX, btnLayout.s3Y, btnLayout.sW, btnLayout.sH)) {
         extern bool solar_sysClicked; solar_sysClicked = true; return;
+    }
+    if (isInButton(screenX, screenY, btnLayout.sceneBtnX, btnLayout.s4Y, btnLayout.sW, btnLayout.sH)) {
+        extern bool block_slopeClicked; block_slopeClicked = true; return;
     }
     
     // Check Objects
@@ -362,10 +371,11 @@ void PhysicsVisualAdapter::onMouseMove(int screenX, int screenY) {
     isPauseHovered = isInButton(screenX, screenY, btnLayout.pauseX, btnLayout.btnY, btnLayout.btnW, btnLayout.btnH);
     isStopHovered = isInButton(screenX, screenY, btnLayout.stopX, btnLayout.btnY, btnLayout.btnW, btnLayout.btnH);
     
-    extern bool sphere_creationHovered, two_starsHovered, solar_sysHovered;
+    extern bool sphere_creationHovered, two_starsHovered, solar_sysHovered, block_slopeHovered;
     sphere_creationHovered = isInButton(screenX, screenY, btnLayout.sceneBtnX, btnLayout.s1Y, btnLayout.sW, btnLayout.sH);
     two_starsHovered = isInButton(screenX, screenY, btnLayout.sceneBtnX, btnLayout.s2Y, btnLayout.sW, btnLayout.sH);
     solar_sysHovered = isInButton(screenX, screenY, btnLayout.sceneBtnX, btnLayout.s3Y, btnLayout.sW, btnLayout.sH);
+    block_slopeHovered = isInButton(screenX, screenY, btnLayout.sceneBtnX, btnLayout.s4Y, btnLayout.sW, btnLayout.sH);
 }
 
 void PhysicsVisualAdapter::onKeyPress(char key) {
@@ -385,6 +395,7 @@ void PhysicsVisualAdapter::onKeyPress(char key) {
         case '1': switchScene(SCENE_SINGLE_OBJECT); break;
         case '2': switchScene(SCENE_TWO_OBJECTS); break;
         case '3': switchScene(SCENE_SPHERE_CREATION); break;
+        case '4': switchScene(SCENE_SOLAR_SYS); break; // Block Slope
     }
 }
 
@@ -407,14 +418,9 @@ void PhysicsVisualAdapter::initializeScene(SceneMode scene) {
     
     switch (scene) {
         case SCENE_SINGLE_OBJECT:
-            // Scene 1: Slope
-            physicsWorld->setInclineAngle(0.0); // Use normal gravity
-            // Create a static slope: x=0, y=2, length=16, angle=0.26 rad (~15 deg)
+            // Scene 1: Slope with Ball
+            physicsWorld->setInclineAngle(0.0); 
             createPhysicsObject(OBJ_SLOPE, 0, 2, 16.0, 0.26, 1000.0, RGB(100, 100, 100), false);
-            // Place ball gently on the slope
-            // Slope eq: y = 2 + tan(0.26)*x. At x=-6: y = 2 + 0.266*(-6) = 0.4.
-            // Ball radius 1.0. Center should be at y = 0.4 + 1.0 = 1.4.
-            // Add a little buffer: y=2.0
             createPhysicsObject(OBJ_CIRCLE, -6, 3.0, 1.0, 0.0, 1.0, RGB(255, 0, 0), true);
             break;
             
@@ -440,14 +446,12 @@ void PhysicsVisualAdapter::initializeScene(SceneMode scene) {
             break;
             
         case SCENE_SOLAR_SYS:
-             // Scene 4: Block vs Wall
+             // Scene 4: Block Slope (NEW)
              physicsWorld->setInclineAngle(0.0);
-             createPhysicsObject(OBJ_WALL, 10, 5, 2.0, 10.0, 0.0, RGB(100, 100, 100), false); // Wall
-             {
-                 int id = createPhysicsObject(OBJ_AABB, -5, 5, 2.0, 2.0, 2.0, RGB(255, 165, 0), true);
-                 Shape* s = objectConnections[id].physicsObject;
-                 if(s) s->setVelocity(8, 0);
-             }
+             // Slope: x=0, y=2, len=16, angle=0.26
+             createPhysicsObject(OBJ_SLOPE, 0, 2, 16.0, 0.26, 1000.0, RGB(100, 100, 100), false);
+             // Block: w=2, h=1
+             createPhysicsObject(OBJ_AABB, -6, 3.0, 2.0, 1.0, 1.0, RGB(0, 0, 255), true);
              break;
 
         default:
