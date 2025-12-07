@@ -21,12 +21,12 @@ set SOURCES=src\main_graphical.cpp src\adapter.cpp src\background_integrated.cpp
 
 REM Compile
 echo Compiling...
-cl /EHsc /nologo /std:c++17 %SOURCES% /Fe:bin\ProjectC_new.exe /link user32.lib gdi32.lib shell32.lib winmm.lib EasyXa.lib
+cl /EHsc /nologo /std:c++17 %SOURCES% /Fe:bin\ProjectC_final.exe /link user32.lib gdi32.lib shell32.lib winmm.lib EasyXa.lib
 
 if %errorlevel% equ 0 (
     echo.
     echo Build successful!
-    echo Run bin\ProjectC_new.exe to start.
+    echo Run bin\ProjectC_final.exe to start.
 ) else (
     echo.
     echo Build failed.
