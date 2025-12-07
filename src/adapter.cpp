@@ -223,8 +223,11 @@ void PhysicsVisualAdapter::renderFrame() {
                 settextcolor(textColor);
                 setbkmode(TRANSPARENT);
                 
-                // Draw larger text
-                renderer->DrawText(buf, renderer->WorldToScreenX(ball.x) + 20, renderer->WorldToScreenY(ball.y) - 20, 20);
+                // Draw larger text centered
+                settextstyle(20, 0, "Consolas");
+                int tw = textwidth(buf);
+                int th = textheight(buf);
+                renderer->DrawText(buf, renderer->WorldToScreenX(ball.x) - tw/2, renderer->WorldToScreenY(ball.y) - th/2, 20);
                 break;
             }
             case OBJ_AABB: {
@@ -243,7 +246,10 @@ void PhysicsVisualAdapter::renderFrame() {
                 settextcolor(textColor);
                 setbkmode(TRANSPARENT);
                 
-                renderer->DrawText(buf, renderer->WorldToScreenX(block.cx) + 20, renderer->WorldToScreenY(block.cy) - 20, 20);
+                settextstyle(20, 0, "Consolas");
+                int tw = textwidth(buf);
+                int th = textheight(buf);
+                renderer->DrawText(buf, renderer->WorldToScreenX(block.cx) - tw/2, renderer->WorldToScreenY(block.cy) - th/2, 20);
                 break;
             }
             case OBJ_SLOPE: {
