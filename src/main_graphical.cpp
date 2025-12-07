@@ -76,8 +76,10 @@ int main() {
     }
     
     adapter.cleanup();
-    // closegraph() is handled by Renderer destructor if we are careful, but explicit is okay
-    // closegraph(); 
+    closegraph();
+    
+    // Force terminate process to ensure all threads (e.g. MCI audio) are closed
+    ExitProcess(0);
     
     return 0;
 }
