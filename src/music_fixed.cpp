@@ -6,7 +6,7 @@
 #pragma comment(lib, "winmm.lib")
 #include <stdio.h>
 
-const char* musicFile = "“Ù¿÷¬∑æ∂.mp3";
+const char* musicFile = "assets/music/Bacgrdmusc.mp3";
 
 void playMusic() {
     mciSendString("close mymusic", NULL, 0, NULL);
@@ -102,3 +102,4 @@ bool MusicPlayer::HandleMouseInput(int mouseX, int mouseY, int messageType) {
 bool MusicPlayer::IsPlaying() { return isPlaying; }
 void MusicPlayer::SetPosition(int x, int y) { posX = x; posY = y; }
 void MusicPlayer::Cleanup() { if (isPlaying) stopMusic(); }
+
