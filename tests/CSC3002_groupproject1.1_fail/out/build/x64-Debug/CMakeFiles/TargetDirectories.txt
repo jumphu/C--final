@@ -1,0 +1,3 @@
+D:/lisp_app_D/VSstudio/VSstudio_file/CSC3002_groupproject1/out/build/x64-Debug/CMakeFiles/PhysicsEngine.dir
+D:/lisp_app_D/VSstudio/VSstudio_file/CSC3002_groupproject1/out/build/x64-Debug/CMakeFiles/edit_cache.dir
+D:/lisp_app_D/VSstudio/VSstudio_file/CSC3002_groupproject1/out/build/x64-Debug/CMakeFiles/rebuild_cache.dir
